@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy – ScreenTrack</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f9fafb;
+      color: #111827;
+      line-height: 1.7;
+    }
+    .container {
+      max-width: 760px;
+      margin: 48px auto;
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 48px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    h1 { font-size: 28px; font-weight: 700; margin-bottom: 6px; color: #00D4AA; }
+    .meta { font-size: 13px; color: #6b7280; margin-bottom: 36px; }
+    h2 { font-size: 17px; font-weight: 600; margin: 32px 0 10px; color: #111827; }
+    p { margin-bottom: 12px; font-size: 15px; color: #374151; }
+    ul { margin: 8px 0 12px 20px; }
+    ul li { font-size: 15px; color: #374151; margin-bottom: 6px; }
+    a { color: #00D4AA; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .highlight {
+      background: #f0fdf9;
+      border-left: 4px solid #00D4AA;
+      padding: 14px 18px;
+      border-radius: 6px;
+      margin: 20px 0;
+      font-size: 15px;
+      color: #065f46;
+    }
+    footer {
+      margin-top: 48px;
+      padding-top: 20px;
+      border-top: 1px solid #e5e7eb;
+      font-size: 13px;
+      color: #9ca3af;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <h1>Privacy Policy</h1>
+    <p class="meta">App: <strong>ScreenTrack</strong> &nbsp;|&nbsp; Last updated: April 9, 2026 &nbsp;|&nbsp; Developer: Chirag Dodia</p>
+
+    <div class="highlight">
+      Your privacy matters. ScreenTrack does not sell, rent, or share your personal data with any third party for commercial purposes.
+    </div>
+
+    <h2>1. What ScreenTrack Does</h2>
+    <p>
+      ScreenTrack is a digital wellbeing application that periodically captures your device screen,
+      analyses the content using artificial intelligence, and provides insights about your emotional
+      state and screen usage patterns to help you build healthier digital habits.
+    </p>
+
+    <h2>2. Data We Collect</h2>
+
+    <h2>2a. Screen Content</h2>
+    <p>
+      With your explicit permission via Android's MediaProjection API, the app captures screenshots
+      of your screen at regular intervals while the capture service is active.
+    </p>
+    <ul>
+      <li>Screenshots are sent to our secure backend server for AI analysis only.</li>
+      <li>Screenshots are <strong>not stored on our servers</strong>. They are processed in real-time and immediately discarded.</li>
+      <li>The resulting analysis data (emotion, sentiment score, content type, text snippet) is stored <strong>locally on your device only</strong>.</li>
+    </ul>
+
+    <h2>2b. Analysis Data (Stored Locally)</h2>
+    <p>The following analysis results are saved to your device's local database:</p>
+    <ul>
+      <li>Detected emotion (e.g. joy, neutral, sadness)</li>
+      <li>Sentiment score (a number between -1 and +1)</li>
+      <li>Content category (e.g. social media, news, work)</li>
+      <li>A short text snippet extracted from the screen</li>
+      <li>Timestamp of each capture</li>
+    </ul>
+    <p>This data is stored for up to 30 days and is never uploaded or shared.</p>
+
+    <h2>2c. Crash Reports (Firebase Crashlytics)</h2>
+    <p>
+      The app uses Google Firebase Crashlytics to automatically collect crash and error reports.
+      This helps us identify and fix bugs. Crash reports may include:
+    </p>
+    <ul>
+      <li>Device model and Android version</li>
+      <li>App version</li>
+      <li>Stack trace at the time of the crash</li>
+    </ul>
+    <p>No screen content or personal analysis data is included in crash reports.</p>
+
+    <h2>2d. Analytics (Firebase Analytics)</h2>
+    <p>
+      The app uses Google Firebase Analytics to collect anonymous usage events such as when
+      screen capture is started or stopped. This data is aggregated and anonymous — we cannot
+      identify individual users from it.
+    </p>
+
+    <h2>3. How We Use Your Data</h2>
+    <ul>
+      <li><strong>Screen captures</strong> — processed server-side to generate emotion, sentiment, and content analysis. Discarded immediately after.</li>
+      <li><strong>Local analysis data</strong> — displayed to you in the app as trends, insights, and wellness suggestions.</li>
+      <li><strong>Crash reports</strong> — used solely to fix bugs and improve stability.</li>
+      <li><strong>Analytics events</strong> — used to understand aggregate feature usage.</li>
+    </ul>
+
+    <h2>4. Data Sharing</h2>
+    <p>We do <strong>not</strong> sell, trade, or share your data with any third parties for advertising or commercial purposes.</p>
+    <p>The only third-party services used are:</p>
+    <ul>
+      <li><strong>Google Firebase</strong> (Crashlytics &amp; Analytics) — governed by <a href="https://policies.google.com/privacy" target="_blank">Google's Privacy Policy</a></li>
+      <li><strong>Groq API</strong> — used by the backend to run AI language models on the extracted text. Governed by <a href="https://groq.com/privacy-policy/" target="_blank">Groq's Privacy Policy</a></li>
+    </ul>
+
+    <h2>5. Data Storage &amp; Security</h2>
+    <ul>
+      <li>All analysis data is stored <strong>only on your device</strong> using Android's Room database.</li>
+      <li>Communication between the app and backend uses <strong>HTTPS encryption</strong>.</li>
+      <li>The backend API is protected with an API key — only the official app can submit data.</li>
+      <li>Local data is retained for 30 days by default, after which it is automatically deleted.</li>
+    </ul>
+
+    <h2>6. Your Rights &amp; Controls</h2>
+    <ul>
+      <li><strong>Stop capture at any time</strong> — tap Stop on the Home screen. No data is collected when the service is off.</li>
+      <li><strong>Delete all data</strong> — go to Settings → Data Management → Clear Data to permanently delete all locally stored analysis data.</li>
+      <li><strong>Uninstall</strong> — uninstalling the app removes all locally stored data from your device.</li>
+    </ul>
+
+    <h2>7. Children's Privacy</h2>
+    <p>
+      ScreenTrack is not directed at children under the age of 13. We do not knowingly collect
+      data from children. If you believe a child has used the app, please contact us and we will
+      take appropriate action.
+    </p>
+
+    <h2>8. Changes to This Policy</h2>
+    <p>
+      We may update this privacy policy from time to time. Any changes will be reflected on this
+      page with an updated date. We encourage you to review this page periodically.
+    </p>
+
+    <h2>9. Contact</h2>
+    <p>
+      If you have any questions or concerns about this privacy policy, please contact us at:<br />
+      <a href="mailto:chiragdodia36@gmail.com">chiragdodia36@gmail.com</a>
+    </p>
+
+    <footer>
+      &copy; 2026 Chirag Dodia · ScreenTrack · All rights reserved
+    </footer>
+
+  </div>
+</body>
+</html>
