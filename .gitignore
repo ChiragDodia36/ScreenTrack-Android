@@ -1,0 +1,27 @@
+# Built artifacts
+*.iml
+.gradle
+/local.properties
+/.idea/
+/build/
+/app/build/
+/captures
+
+# Signing
+*.jks
+*.keystore
+keystore.properties
+
+# Firebase — contains project-specific API keys, do not commit
+app/google-services.json
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+firebase-debug.log
+
+# Internal planning files
+memory.md
+claude.md

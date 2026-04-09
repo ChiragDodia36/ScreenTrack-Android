@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Adaptive icon safe zone: 66dp centered in 108dp -->
+    <!-- ScreenTrack logo: stylized screen/monitor with eye/pulse -->
+
+    <!-- Monitor frame -->
+    <path
+        android:fillColor="#00D4AA"
+        android:pathData="M30,32 L78,32 C80.2,32 82,33.8 82,36 L82,64 C82,66.2 80.2,68 78,68 L30,68 C27.8,68 26,66.2 26,64 L26,36 C26,33.8 27.8,32 30,32 Z M30,36 L30,64 L78,64 L78,36 Z" />
+
+    <!-- Monitor stand -->
+    <path
+        android:fillColor="#00D4AA"
+        android:pathData="M48,68 L60,68 L60,72 L48,72 Z" />
+    <path
+        android:fillColor="#00D4AA"
+        android:pathData="M42,72 L66,72 L66,76 L42,76 Z" />
+
+    <!-- Pulse/heartbeat line inside screen -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#00D4AA"
+        android:strokeWidth="2.5"
+        android:pathData="M32,50 L42,50 L46,40 L50,58 L54,44 L58,54 L62,50 L76,50" />
+</vector>
