@@ -1,4 +1,4 @@
-package com.screentrack.mobile
+package com.chiragdodia.screentrack
 
 import kotlinx.coroutines.delay
 import okhttp3.MediaType.Companion.toMediaType

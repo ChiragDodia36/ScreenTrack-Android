@@ -1,4 +1,4 @@
-package com.screentrack.mobile
+package com.chiragdodia.screentrack
 
 import android.graphics.Canvas
 import android.graphics.Color

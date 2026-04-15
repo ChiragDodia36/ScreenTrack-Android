@@ -1,4 +1,4 @@
-package com.screentrack.mobile
+package com.chiragdodia.screentrack
 
 import android.app.NotificationChannel
 import android.app.NotificationManager

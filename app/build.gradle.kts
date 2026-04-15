@@ -17,11 +17,11 @@ val keystoreProperties = Properties().apply {
 }
 
 android {
-    namespace = "com.screentrack.mobile"
+    namespace = "com.chiragdodia.screentrack"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.screentrack.mobile"
+        applicationId = "com.chiragdodia.screentrack"
         minSdk = 26
         targetSdk = 34
         versionCode = 1
@@ -49,7 +49,7 @@ android {
                 ?: System.getenv("SCREENTRACK_KEY_PASSWORD")
 
             if (ksPath != null) {
-                storeFile = file(ksPath)
+                storeFile = rootProject.file(ksPath)
                 storePassword = ksPassword
                 keyAlias = ksKeyAlias
                 keyPassword = ksKeyPassword

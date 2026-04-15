@@ -1,4 +1,4 @@
-package com.screentrack.mobile
+package com.chiragdodia.screentrack
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable

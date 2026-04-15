@@ -1,4 +1,4 @@
-package com.screentrack.mobile
+package com.chiragdodia.screentrack
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey

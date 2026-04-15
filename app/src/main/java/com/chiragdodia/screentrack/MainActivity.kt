@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalMaterial3Api::class)
 
-package com.screentrack.mobile
+package com.chiragdodia.screentrack
 
 import android.Manifest
 import android.app.Activity
