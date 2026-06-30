@@ -172,7 +172,6 @@ class MainActivity : ComponentActivity() {
 
             val intervalSeconds = 15
             val retentionDays = 30
-            var jpegQuality by remember { mutableStateOf(prefs.getInt("jpeg_quality", 65)) }
             var maxDimension by remember { mutableStateOf(prefs.getInt("max_dimension", 720)) }
             var pauseWhenScreenOff by remember { mutableStateOf(prefs.getBoolean("pause_screen_off", true)) }
 
@@ -182,21 +181,19 @@ class MainActivity : ComponentActivity() {
 
             val coroutineScope = rememberCoroutineScope()
 
-            val qualityError = validateRange(jpegQuality, 10, 100, "JPEG quality")
             val dimensionError = validateRange(maxDimension, 240, 2160, "Max dimension")
-            val hasErrors = listOf(qualityError, dimensionError).any { it != null }
+            val hasErrors = listOf(dimensionError).any { it != null }
 
             val captureLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.StartActivityForResult()
             ) { result ->
                 if (result.resultCode == Activity.RESULT_OK && result.data != null) {
-                    savePrefs(prefs, intervalSeconds, jpegQuality, maxDimension, retentionDays, pauseWhenScreenOff)
+                    savePrefs(prefs, intervalSeconds, maxDimension, retentionDays, pauseWhenScreenOff)
                     ScreenCaptureService.start(
                         context = this,
                         resultCode = result.resultCode,
                         data = result.data!!,
                         intervalMs = intervalSeconds.coerceIn(1, 60) * 1000L,
-                        jpegQuality = jpegQuality.coerceIn(10, 100),
                         maxDimension = maxDimension.coerceIn(240, 2160),
                         retentionDays = retentionDays.coerceIn(1, 90).toLong(),
                         pauseWhenScreenOff = pauseWhenScreenOff
@@ -348,9 +345,6 @@ class MainActivity : ComponentActivity() {
                             )
                             AppPage.Settings -> SettingsScreen(
                                 paddingValues = paddingValues,
-                                jpegQuality = jpegQuality,
-                                onJpegQualityChange = { jpegQuality = it },
-                                qualityError = qualityError,
                                 maxDimension = maxDimension,
                                 onMaxDimensionChange = { maxDimension = it },
                                 dimensionError = dimensionError,
@@ -428,14 +422,12 @@ class MainActivity : ComponentActivity() {
     private fun savePrefs(
         prefs: android.content.SharedPreferences,
         intervalSeconds: Int,
-        jpegQuality: Int,
         maxDimension: Int,
         retentionDays: Int,
         pauseWhenScreenOff: Boolean
     ) {
         prefs.edit()
             .putInt("interval_seconds", intervalSeconds)
-            .putInt("jpeg_quality", jpegQuality)
             .putInt("max_dimension", maxDimension)
             .putInt("retention_days", retentionDays)
             .putBoolean("pause_screen_off", pauseWhenScreenOff)
@@ -681,15 +673,6 @@ private fun HomeScreen(
                         ) {
                             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 SummaryRow("Content", "${latestResult.contentType} (${formatScore(latestResult.contentConfidence)})")
-                                if (latestResult.textSnippet.isNotBlank()) {
-                                    Text(
-                                        latestResult.textSnippet,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = TextSecondary,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
                             }
                         }
                     } else {
@@ -1197,9 +1180,6 @@ private fun InsightsScreen(
 @Composable
 private fun SettingsScreen(
     paddingValues: PaddingValues,
-    jpegQuality: Int,
-    onJpegQualityChange: (Int) -> Unit,
-    qualityError: String?,
     maxDimension: Int,
     onMaxDimensionChange: (Int) -> Unit,
     dimensionError: String?,
@@ -1248,17 +1228,6 @@ private fun SettingsScreen(
                             )
                         }
                     }
-                    OutlinedTextField(
-                        value = jpegQuality.toString(),
-                        onValueChange = { onJpegQualityChange(it.toIntOrNull() ?: jpegQuality) },
-                        label = { Text("JPEG Quality (10-100)") },
-                        singleLine = true,
-                        isError = qualityError != null,
-                        supportingText = { qualityError?.let { Text(it) } },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = textFieldColors,
-                        shape = RoundedCornerShape(12.dp)
-                    )
                     OutlinedTextField(
                         value = maxDimension.toString(),
                         onValueChange = { onMaxDimensionChange(it.toIntOrNull() ?: maxDimension) },

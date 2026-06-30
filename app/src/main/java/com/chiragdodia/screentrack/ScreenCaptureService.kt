@@ -22,7 +22,6 @@ import android.os.IBinder
 import android.os.SystemClock
 import android.view.Display
 import androidx.core.app.NotificationCompat
-import com.google.firebase.analytics.FirebaseAnalytics
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -38,7 +37,6 @@ class ScreenCaptureService : Service() {
     private var handler: Handler? = null
 
     private var intervalMs: Long = 5000L
-    private var jpegQuality: Int = 65
     private var maxDimension: Int = 720
     private var retentionDays: Long = 30L
     private var pauseWhenScreenOff: Boolean = true
@@ -64,7 +62,6 @@ class ScreenCaptureService : Service() {
         val data = intent?.getParcelableExtra<Intent>(EXTRA_PROJECTION_DATA)
 
         intervalMs = (intent?.getLongExtra(EXTRA_INTERVAL_MS, intervalMs) ?: intervalMs).coerceIn(1000L, 60_000L)
-        jpegQuality = (intent?.getIntExtra(EXTRA_JPEG_QUALITY, jpegQuality) ?: jpegQuality).coerceIn(10, 100)
         maxDimension = (intent?.getIntExtra(EXTRA_MAX_DIMENSION, maxDimension) ?: maxDimension).coerceIn(240, 2160)
         retentionDays = intent?.getLongExtra(EXTRA_RETENTION_DAYS, retentionDays) ?: retentionDays
         pauseWhenScreenOff = intent?.getBooleanExtra(EXTRA_PAUSE_SCREEN_OFF, pauseWhenScreenOff) ?: pauseWhenScreenOff
@@ -88,7 +85,6 @@ class ScreenCaptureService : Service() {
             setLastError(null)
         }
 
-        FirebaseAnalytics.getInstance(this).logEvent("capture_started", null)
         startProjection(resultCode, data)
         registerScreenReceiver()
         return START_STICKY
@@ -99,7 +95,6 @@ class ScreenCaptureService : Service() {
         stopProjection()
         analyzer.close()
         ServiceStatusStore.getInstance(applicationContext).setRunning(false)
-        FirebaseAnalytics.getInstance(this).logEvent("capture_stopped", null)
         super.onDestroy()
     }
 
@@ -150,12 +145,6 @@ class ScreenCaptureService : Service() {
 
                     val result = analyzer.analyze(scaled)
                     scaled.recycle()
-
-                    val bundle = android.os.Bundle().apply {
-                        putString("emotion", result.emotion)
-                        putString("content_type", result.contentType)
-                    }
-                    FirebaseAnalytics.getInstance(this@ScreenCaptureService).logEvent("analysis_received", bundle)
 
                     val repository = CaptureRepository.getInstance(applicationContext)
                     repository.addResult(
@@ -301,7 +290,6 @@ class ScreenCaptureService : Service() {
         private const val EXTRA_RESULT_CODE = "extra_result_code"
         private const val EXTRA_PROJECTION_DATA = "extra_projection_data"
         private const val EXTRA_INTERVAL_MS = "extra_interval_ms"
-        private const val EXTRA_JPEG_QUALITY = "extra_jpeg_quality"
         private const val EXTRA_MAX_DIMENSION = "extra_max_dimension"
         private const val EXTRA_RETENTION_DAYS = "extra_retention_days"
         private const val EXTRA_PAUSE_SCREEN_OFF = "extra_pause_screen_off"
@@ -311,7 +299,6 @@ class ScreenCaptureService : Service() {
             resultCode: Int,
             data: Intent,
             intervalMs: Long,
-            jpegQuality: Int,
             maxDimension: Int,
             retentionDays: Long,
             pauseWhenScreenOff: Boolean
@@ -320,7 +307,6 @@ class ScreenCaptureService : Service() {
                 putExtra(EXTRA_RESULT_CODE, resultCode)
                 putExtra(EXTRA_PROJECTION_DATA, data)
                 putExtra(EXTRA_INTERVAL_MS, intervalMs)
-                putExtra(EXTRA_JPEG_QUALITY, jpegQuality)
                 putExtra(EXTRA_MAX_DIMENSION, maxDimension)
                 putExtra(EXTRA_RETENTION_DAYS, retentionDays)
                 putExtra(EXTRA_PAUSE_SCREEN_OFF, pauseWhenScreenOff)
