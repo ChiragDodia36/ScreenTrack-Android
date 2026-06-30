@@ -29,12 +29,15 @@ the following derived fields in a local database:
 | Field | Description | Example |
 |-------|-------------|---------|
 | `timestamp` | When the sample was taken | 2026-06-29 14:32 |
-| `emotion` | Dominant emotion label inferred from on-screen text | "joy", "sadness", "neutral" |
+| `emotion` | Dominant emotion label inferred from on-screen text and/or a visible face | "joy", "sadness", "undetermined" |
 | `emotionScore` | Confidence of the emotion label (0–1) | 0.74 |
-| `sentiment` | Sentiment value derived from emotion (−1 to +1) | −0.5 |
-| `contentType` | Activity category | "social_media", "work" |
+| `sentiment` | Sentiment value, positive↔negative (−1 to +1) | −0.5 |
+| `contentType` | Activity category inferred from on-screen text | "social_media", "education" |
 | `contentConfidence` | Confidence of the category (0–1) | 0.6 |
-| `textSnippet` | Up to **200 characters** of text recognized on screen | (see §6 — sensitive) |
+
+**No recognized text is stored.** When neither readable text nor a visible face
+yields a signal, `emotion` is recorded as `"undetermined"` rather than a fabricated
+value.
 
 ## 3. How data is collected (processing pipeline)
 
@@ -44,19 +47,23 @@ the following derived fields in a local database:
 2. Each captured frame is held **only in memory**, downscaled, and passed to an
    **on-device** analyzer.
 3. The analyzer uses **Google ML Kit on-device text recognition (OCR)** to read
-   visible text, then applies local keyword-based rules to classify emotion and
-   content category. **No cloud service is contacted for this analysis.**
+   visible text, and **on-device face detection** to read a facial expression
+   (smiling probability) when a face is visible. Local rules classify emotion,
+   sentiment, and content category. **No cloud service is contacted.**
 4. The image is **immediately discarded from memory** (`recycle()`) after
    analysis. It is never written to storage and never transmitted.
 5. Only the derived fields in §2 are written to the local database.
+6. Capture **auto-pauses during phone and VoIP/video calls** and whenever the
+   participant taps **Pause**, so private conversations are not analyzed.
 
 ## 4. What is explicitly NOT collected or stored
 
 - ❌ **No screenshots or images** are ever saved to disk or sent anywhere.
-- ❌ **No full screen text** is stored — only a truncated snippet (≤200 chars).
+- ❌ **No recognized text is stored** — text is read in memory only and discarded.
+- ❌ **No face images** are stored — only a transient smiling probability is used.
 - ❌ **No keystrokes, passwords, contacts, location, or files** are accessed.
 - ❌ **No audio or camera** access.
-- ❌ **No raw data is transmitted to any study/third-party server.**
+- ❌ **No data is transmitted anywhere.** The app has no `INTERNET` permission.
 
 ## 5. Where data is stored
 
@@ -68,24 +75,22 @@ the following derived fields in a local database:
 - The participant can stop collection at any time and uninstalling the app
   removes all stored data.
 
-## 6. Sensitive-data consideration: text snippet
+## 6. Facial-expression analysis (on-device)
 
-The 200-character `textSnippet` can, in principle, contain fragments of personal
-text visible on screen (e.g., part of a message). It is stored **only on the
-participant's device** and never transmitted. Mitigations:
-
-- It is truncated to 200 characters.
-- It is covered by the 30-day deletion window.
-- **Recommended for the study:** disable or further shorten the snippet if the
-  research questions do not require it, to minimize stored sensitive content.
+When a face is visible on screen (e.g., a person in a video), the app reads its
+**smiling probability** on-device to inform the positive/negative reading. This
+is computed in memory and **never stored or transmitted** — no face image or
+identity is retained. Because a face may belong to someone other than the
+participant (e.g., in a video), capture **auto-pauses during phone and video/VoIP
+calls** so private conversations are excluded, and the participant can pause
+manually at any time.
 
 ## 7. Data that leaves the device
 
-The only off-device transmission is a **Firebase Analytics** event named
-`analysis_received` containing two category labels: `emotion` and `content_type`
-(e.g., "joy" / "social_media"). This contains **no screen images, no recognized
-text, and no direct identifiers** — only aggregate category labels tied to
-Firebase's anonymous installation identifier.
+**Nothing.** All analysis is on-device, and the app has **no `INTERNET`
+permission** — it is technically incapable of transmitting data. There is no
+analytics, no crash reporting, and no server of any kind. (The earlier
+Firebase Analytics has been removed from the study build.)
 
 - **Recommended for the study:** consider **disabling analytics entirely** for
   study builds so that *no* participant-derived data leaves the device. This
@@ -105,8 +110,9 @@ Firebase's anonymous installation identifier.
 ## 9. Participant controls
 
 - Start/stop capture at any time from within the app.
-- Capture automatically pauses when the screen is off.
-- Configurable sampling interval and retention period.
+- **Manual Pause/Resume** button to stop collection at any moment.
+- Capture automatically pauses when the screen is off and **during phone/video calls**.
+- Configurable retention period.
 - Uninstalling removes all locally stored data.
 
 ## 10. Summary of privacy posture
@@ -114,17 +120,23 @@ Firebase's anonymous installation identifier.
 | Question | Answer |
 |----------|--------|
 | Are screenshots stored? | No — discarded immediately after on-device analysis |
+| Is recognized text stored? | No — read in memory only, never saved |
+| Are face images stored? | No — only a transient smiling probability is used |
 | Is screen content sent to a server? | No |
-| Does analysis use the cloud? | No — fully on-device (ML Kit OCR + local rules) |
-| What leaves the device? | Only two aggregate category labels via analytics (recommend disabling) |
+| Does analysis use the cloud? | No — fully on-device (ML Kit OCR + face + local rules) |
+| **What leaves the device?** | **Nothing** — the app has no INTERNET permission |
 | Where is data kept? | Locally on the participant's device only |
 | How long? | 30 days, then auto-deleted |
 | Platform | Android only |
 
 ---
 
-### Open items for the research team
+### Notes for the research team
 
-1. **Confirm the study uses the on-device build** (not the earlier server-upload version).
-2. **Decision:** keep or disable the `textSnippet` field (§6).
-3. **Decision:** keep or disable Firebase Analytics for study builds (§7).
+1. The study build is the **on-device version** (the earlier server-upload version
+   is retired).
+2. The `textSnippet` field has been **removed** — no recognized text is stored.
+3. Firebase Analytics and crash reporting have been **removed** — nothing leaves
+   the device.
+4. New: the app performs **on-device facial-expression analysis** (§6), mitigated
+   by auto-pause during calls and a manual pause.
