@@ -166,6 +166,7 @@ class MainActivity : ComponentActivity() {
             val recentResults by viewModel.recentResults.collectAsState()
             val latestResult by viewModel.latestResult.collectAsState()
             val isRunning by viewModel.isRunning.collectAsState()
+            val isPaused by viewModel.isPaused.collectAsState()
             val lastError by viewModel.lastError.collectAsState()
             val lastUploadAt by viewModel.lastUploadAt.collectAsState()
             val selectedRange by viewModel.selectedTimeRange.collectAsState()
@@ -205,6 +206,10 @@ class MainActivity : ComponentActivity() {
                 ActivityResultContracts.RequestPermission()
             ) { }
 
+            val phoneStatePermissionLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.RequestPermission()
+            ) { }
+
             val exportHoursState = remember { mutableStateOf(1) }
             val exportLabelState = remember { mutableStateOf("1 Hour") }
 
@@ -230,6 +235,7 @@ class MainActivity : ComponentActivity() {
                 if (Build.VERSION.SDK_INT >= 33) {
                     notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
+                phoneStatePermissionLauncher.launch(Manifest.permission.READ_PHONE_STATE)
             }
 
             val mainHaptic = LocalHapticFeedback.current
@@ -324,6 +330,11 @@ class MainActivity : ComponentActivity() {
                                 onStopCapture = { ScreenCaptureService.stop(this@MainActivity) },
                                 canStartCapture = !isRunning && !hasErrors,
                                 canStopCapture = isRunning,
+                                isPaused = isPaused,
+                                onPauseToggle = {
+                                    if (isPaused) ScreenCaptureService.resume(this@MainActivity)
+                                    else ScreenCaptureService.pause(this@MainActivity)
+                                },
                                 filteredResults = filteredResults,
                                 selectedRange = selectedRange,
                                 onViewTrends = { currentPage = AppPage.Trends }
@@ -579,6 +590,8 @@ private fun HomeScreen(
     onStopCapture: () -> Unit,
     canStartCapture: Boolean,
     canStopCapture: Boolean,
+    isPaused: Boolean,
+    onPauseToggle: () -> Unit,
     filteredResults: List<CaptureResultEntity>,
     selectedRange: TimeRangeOption,
     onViewTrends: () -> Unit
@@ -714,6 +727,19 @@ private fun HomeScreen(
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = ErrorCoral)
                 ) {
                     Text("Stop", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        if (isRunning) {
+            item {
+                OutlinedButton(
+                    onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); onPauseToggle() },
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentTeal)
+                ) {
+                    Text(if (isPaused) "Resume Collection" else "Pause Collection", fontWeight = FontWeight.Bold)
                 }
             }
         }
