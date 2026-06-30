@@ -110,6 +110,7 @@ dependencies {
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.google.mlkit:text-recognition:16.0.0")
+    implementation("com.google.mlkit:face-detection:16.1.7")
 
     implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
     implementation("com.google.firebase:firebase-crashlytics-ktx")
