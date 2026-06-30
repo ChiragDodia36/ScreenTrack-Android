@@ -10,15 +10,21 @@ class ServiceStatusStore private constructor(context: Context) {
     private val _lastError = MutableStateFlow(prefs.getString(KEY_LAST_ERROR, null))
     private val _lastUploadAt = MutableStateFlow(prefs.getLong(KEY_LAST_UPLOAD, 0L).takeIf { it > 0 })
     private val _lastNotificationAt = MutableStateFlow(prefs.getLong(KEY_LAST_NOTIFY, 0L).takeIf { it > 0 })
+    private val _isPaused = MutableStateFlow(false)
 
     val isRunning: StateFlow<Boolean> = _isRunning
     val lastError: StateFlow<String?> = _lastError
     val lastUploadAt: StateFlow<Long?> = _lastUploadAt
     val lastNotificationAt: StateFlow<Long?> = _lastNotificationAt
+    val isPaused: StateFlow<Boolean> = _isPaused
 
     fun setRunning(value: Boolean) {
         prefs.edit().putBoolean(KEY_RUNNING, value).apply()
         _isRunning.value = value
+    }
+
+    fun setPaused(value: Boolean) {
+        _isPaused.value = value
     }
 
     fun setLastError(message: String?) {

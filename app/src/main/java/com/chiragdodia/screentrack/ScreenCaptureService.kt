@@ -44,8 +44,14 @@ class ScreenCaptureService : Service() {
     private val analyzer = OnDeviceAnalyzer()
 
     private var lastCaptureAt: Long = 0L
-    private var isPaused: Boolean = false
+    private var pauseState = PauseState()
+    private var callMonitor: CallMonitor? = null
     private var screenReceiver: BroadcastReceiver? = null
+
+    private fun updatePause(transform: (PauseState) -> PauseState) {
+        pauseState = transform(pauseState)
+        ServiceStatusStore.getInstance(applicationContext).setPaused(pauseState.isPaused)
+    }
     private var lastSuggestionAt: Long = 0L
     private var consecutiveErrors: Int = 0
 
@@ -55,6 +61,10 @@ class ScreenCaptureService : Service() {
         if (intent?.action == ACTION_STOP) {
             stopSelfSafely()
             return START_NOT_STICKY
+        }
+        when (intent?.action) {
+            ACTION_PAUSE -> { updatePause { it.copy(manual = true) }; return START_STICKY }
+            ACTION_RESUME -> { updatePause { it.copy(manual = false) }; return START_STICKY }
         }
 
         val resultCode = intent?.getIntExtra(EXTRA_RESULT_CODE, 0) ?: 0
@@ -87,10 +97,14 @@ class ScreenCaptureService : Service() {
 
         startProjection(resultCode, data)
         registerScreenReceiver()
+        callMonitor = CallMonitor(applicationContext) { active ->
+            updatePause { it.copy(onCall = active) }
+        }.also { it.start() }
         return START_STICKY
     }
 
     override fun onDestroy() {
+        callMonitor?.stop()
         unregisterScreenReceiver()
         stopProjection()
         analyzer.close()
@@ -127,7 +141,7 @@ class ScreenCaptureService : Service() {
                 return@setOnImageAvailableListener
             }
 
-            if (isPaused) {
+            if (pauseState.isPaused) {
                 reader.acquireLatestImage()?.close()
                 return@setOnImageAvailableListener
             }
@@ -211,8 +225,8 @@ class ScreenCaptureService : Service() {
         screenReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 when (intent?.action) {
-                    Intent.ACTION_SCREEN_OFF -> isPaused = true
-                    Intent.ACTION_USER_PRESENT -> isPaused = false
+                    Intent.ACTION_SCREEN_OFF -> updatePause { it.copy(screenOff = true) }
+                    Intent.ACTION_USER_PRESENT -> updatePause { it.copy(screenOff = false) }
                 }
             }
         }
@@ -228,7 +242,7 @@ class ScreenCaptureService : Service() {
             unregisterReceiver(it)
             screenReceiver = null
         }
-        isPaused = false
+        updatePause { PauseState() }
     }
 
     private suspend fun maybeNotify(repository: CaptureRepository) {
@@ -284,6 +298,8 @@ class ScreenCaptureService : Service() {
     companion object {
         private const val NOTIFICATION_ID = 1001
         private const val ACTION_STOP = "com.chiragdodia.screentrack.action.STOP"
+        const val ACTION_PAUSE = "com.chiragdodia.screentrack.action.PAUSE"
+        const val ACTION_RESUME = "com.chiragdodia.screentrack.action.RESUME"
         private const val NOTIFICATION_COOLDOWN_MS = 15 * 60 * 1000L
         private const val ONE_HOUR_MS = 60 * 60 * 1000L
 
@@ -320,5 +336,11 @@ class ScreenCaptureService : Service() {
             }
             context.startService(intent)
         }
+
+        fun pause(context: Context) = context.startService(
+            Intent(context, ScreenCaptureService::class.java).apply { action = ACTION_PAUSE })
+
+        fun resume(context: Context) = context.startService(
+            Intent(context, ScreenCaptureService::class.java).apply { action = ACTION_RESUME })
     }
 }
