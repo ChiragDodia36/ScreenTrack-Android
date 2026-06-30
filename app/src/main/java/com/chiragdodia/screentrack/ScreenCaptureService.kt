@@ -15,8 +15,6 @@ import android.hardware.display.VirtualDisplay
 import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
@@ -29,7 +27,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import java.io.ByteArrayOutputStream
 
 class ScreenCaptureService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -43,10 +40,10 @@ class ScreenCaptureService : Service() {
     private var intervalMs: Long = 5000L
     private var jpegQuality: Int = 65
     private var maxDimension: Int = 720
-    private val backendUrl: String = BuildConfig.BACKEND_URL
-    private val apiKey: String = BuildConfig.BACKEND_API_KEY
     private var retentionDays: Long = 30L
     private var pauseWhenScreenOff: Boolean = true
+
+    private val analyzer = OnDeviceAnalyzer()
 
     private var lastCaptureAt: Long = 0L
     private var isPaused: Boolean = false
@@ -63,6 +60,7 @@ class ScreenCaptureService : Service() {
         }
 
         val resultCode = intent?.getIntExtra(EXTRA_RESULT_CODE, 0) ?: 0
+        @Suppress("DEPRECATION")
         val data = intent?.getParcelableExtra<Intent>(EXTRA_PROJECTION_DATA)
 
         intervalMs = (intent?.getLongExtra(EXTRA_INTERVAL_MS, intervalMs) ?: intervalMs).coerceIn(1000L, 60_000L)
@@ -76,16 +74,10 @@ class ScreenCaptureService : Service() {
             return START_NOT_STICKY
         }
 
-        // Validate URL — blank means backend was not configured in keystore.properties
-        if (backendUrl.isBlank()) {
-            ServiceStatusStore.getInstance(applicationContext).setLastError("Backend URL not configured")
-            stopSelfSafely()
-            return START_NOT_STICKY
-        }
-        try {
-            java.net.URL(backendUrl)
-        } catch (e: java.net.MalformedURLException) {
-            ServiceStatusStore.getInstance(applicationContext).setLastError("Invalid backend URL")
+        val consentGiven = getSharedPreferences("screentrack_prefs", MODE_PRIVATE)
+            .getBoolean("consent_given", false)
+        if (!consentGiven) {
+            ServiceStatusStore.getInstance(applicationContext).setLastError("Consent not given")
             stopSelfSafely()
             return START_NOT_STICKY
         }
@@ -105,6 +97,7 @@ class ScreenCaptureService : Service() {
     override fun onDestroy() {
         unregisterScreenReceiver()
         stopProjection()
+        analyzer.close()
         ServiceStatusStore.getInstance(applicationContext).setRunning(false)
         FirebaseAnalytics.getInstance(this).logEvent("capture_stopped", null)
         super.onDestroy()
@@ -155,49 +148,34 @@ class ScreenCaptureService : Service() {
                     val scaled = ImageUtils.scaleToMaxDimension(bitmap, maxDimension)
                     bitmap.recycle()
 
-                    val outputStream = ByteArrayOutputStream()
-                    val safeQuality = jpegQuality.coerceIn(10, 100)
-                    scaled.compress(android.graphics.Bitmap.CompressFormat.JPEG, safeQuality, outputStream)
+                    val result = analyzer.analyze(scaled)
                     scaled.recycle()
 
-                    val bytes = outputStream.toByteArray()
-                    if (!isNetworkAvailable()) {
-                        ServiceStatusStore.getInstance(applicationContext)
-                            .setLastError("No network connection")
-                        return@launch
+                    val bundle = android.os.Bundle().apply {
+                        putString("emotion", result.emotion)
+                        putString("content_type", result.contentType)
                     }
+                    FirebaseAnalytics.getInstance(this@ScreenCaptureService).logEvent("analysis_received", bundle)
 
-                    val result = FrameUploader.uploadFrame(bytes, backendUrl, apiKey)
-                    if (result.analysis != null) {
-                        val bundle = android.os.Bundle().apply {
-                            putString("emotion", result.analysis.emotion)
-                            putString("content_type", result.analysis.contentType)
-                        }
-                        FirebaseAnalytics.getInstance(this@ScreenCaptureService).logEvent("analysis_received", bundle)
-                        val repository = CaptureRepository.getInstance(applicationContext)
-                        repository.addResult(
-                            CaptureResultEntity(
-                                timestampMs = System.currentTimeMillis(),
-                                emotion = result.analysis.emotion,
-                                emotionScore = result.analysis.emotionConfidence,
-                                sentiment = result.analysis.sentimentScore,
-                                contentType = result.analysis.contentType,
-                                contentConfidence = result.analysis.contentConfidence,
-                                textSnippet = result.analysis.textPreview
-                            ),
-                            retentionDays = retentionDays
-                        )
-                        ServiceStatusStore.getInstance(applicationContext).apply {
-                            setLastError(null)
-                            setLastUploadAt(System.currentTimeMillis())
-                        }
-                        consecutiveErrors = 0
-                        maybeNotify(repository)
-                    } else if (result.error != null) {
-                        consecutiveErrors++
-                        ServiceStatusStore.getInstance(applicationContext)
-                            .setLastError("${result.error} (errors: $consecutiveErrors)")
+                    val repository = CaptureRepository.getInstance(applicationContext)
+                    repository.addResult(
+                        CaptureResultEntity(
+                            timestampMs = System.currentTimeMillis(),
+                            emotion = result.emotion,
+                            emotionScore = result.emotionConfidence,
+                            sentiment = result.sentiment,
+                            contentType = result.contentType,
+                            contentConfidence = result.contentConfidence,
+                            textSnippet = result.textSnippet
+                        ),
+                        retentionDays = retentionDays
+                    )
+                    ServiceStatusStore.getInstance(applicationContext).apply {
+                        setLastError(null)
+                        setLastUploadAt(System.currentTimeMillis())
                     }
+                    consecutiveErrors = 0
+                    maybeNotify(repository)
                 } catch (e: Exception) {
                     consecutiveErrors++
                     ServiceStatusStore.getInstance(applicationContext)
@@ -265,13 +243,6 @@ class ScreenCaptureService : Service() {
         isPaused = false
     }
 
-    private fun isNetworkAvailable(): Boolean {
-        val manager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val network = manager.activeNetwork ?: return false
-        val capabilities = manager.getNetworkCapabilities(network) ?: return false
-        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-    }
-
     private suspend fun maybeNotify(repository: CaptureRepository) {
         val now = System.currentTimeMillis()
         if (now - lastSuggestionAt < NOTIFICATION_COOLDOWN_MS) return
@@ -324,7 +295,7 @@ class ScreenCaptureService : Service() {
 
     companion object {
         private const val NOTIFICATION_ID = 1001
-        private const val ACTION_STOP = "com.screentrack.mobile.action.STOP"
+        private const val ACTION_STOP = "com.chiragdodia.screentrack.action.STOP"
         private const val NOTIFICATION_COOLDOWN_MS = 15 * 60 * 1000L
         private const val ONE_HOUR_MS = 60 * 60 * 1000L
 

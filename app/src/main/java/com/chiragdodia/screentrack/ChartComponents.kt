@@ -491,8 +491,6 @@ fun ContentBarChart(items: List<CaptureResultEntity>) {
     }
 }
 
-fun emotionColorForChart(emotion: String): Color = emotionColor(emotion)
-
 fun emotionColor(emotion: String): Color {
     return when (emotion.lowercase()) {
         "joy", "happy" -> EmotionJoy

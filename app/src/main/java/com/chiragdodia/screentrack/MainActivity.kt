@@ -105,10 +105,7 @@ import androidx.core.content.getSystemService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import java.util.Locale
-import java.util.concurrent.TimeUnit
 
 // ── Dark Theme Colors ──
 private val DarkBackground = Color(0xFF0F1118)
@@ -180,19 +177,10 @@ class MainActivity : ComponentActivity() {
             var pauseWhenScreenOff by remember { mutableStateOf(prefs.getBoolean("pause_screen_off", true)) }
 
             var showClearDialog by remember { mutableStateOf(false) }
+            var showConsentDialog by remember { mutableStateOf(false) }
             var currentPage by remember { mutableStateOf(AppPage.Home) }
-            var connectionStatus by remember { mutableStateOf<String?>(null) }
-            var isTestingConnection by remember { mutableStateOf(false) }
 
             val coroutineScope = rememberCoroutineScope()
-            val httpClient = remember {
-                OkHttpClient.Builder()
-                    .callTimeout(20, TimeUnit.SECONDS)
-                    .connectTimeout(15, TimeUnit.SECONDS)
-                    .readTimeout(20, TimeUnit.SECONDS)
-                    .retryOnConnectionFailure(true)
-                    .build()
-            }
 
             val qualityError = validateRange(jpegQuality, 10, 100, "JPEG quality")
             val dimensionError = validateRange(maxDimension, 240, 2160, "Max dimension")
@@ -329,9 +317,11 @@ class MainActivity : ComponentActivity() {
                                 latestResult = latestResult,
                                 lastUploadAt = lastUploadAt,
                                 onStartCapture = {
-                                    val projectionManager = getSystemService<MediaProjectionManager>()
-                                    if (projectionManager != null) {
-                                        captureLauncher.launch(projectionManager.createScreenCaptureIntent())
+                                    if (!prefs.getBoolean("consent_given", false)) {
+                                        showConsentDialog = true
+                                    } else {
+                                        val projectionManager = getSystemService<MediaProjectionManager>()
+                                        projectionManager?.let { captureLauncher.launch(it.createScreenCaptureIntent()) }
                                     }
                                 },
                                 onStopCapture = { ScreenCaptureService.stop(this@MainActivity) },
@@ -358,17 +348,6 @@ class MainActivity : ComponentActivity() {
                             )
                             AppPage.Settings -> SettingsScreen(
                                 paddingValues = paddingValues,
-                                connectionStatus = connectionStatus,
-                                isTestingConnection = isTestingConnection,
-                                onTestConnection = {
-                                    connectionStatus = null
-                                    isTestingConnection = true
-                                    coroutineScope.launch {
-                                        val result = testBackendConnection(httpClient, BuildConfig.BACKEND_URL)
-                                        connectionStatus = result
-                                        isTestingConnection = false
-                                    }
-                                },
                                 jpegQuality = jpegQuality,
                                 onJpegQualityChange = { jpegQuality = it },
                                 qualityError = qualityError,
@@ -392,6 +371,36 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+            }
+
+            if (showConsentDialog) {
+                AlertDialog(
+                    onDismissRequest = { showConsentDialog = false },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            prefs.edit().putBoolean("consent_given", true).apply()
+                            showConsentDialog = false
+                            val projectionManager = getSystemService<MediaProjectionManager>()
+                            projectionManager?.let { captureLauncher.launch(it.createScreenCaptureIntent()) }
+                        }) { Text("I Understand, Continue", color = AccentTeal) }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showConsentDialog = false }) { Text("Cancel") }
+                    },
+                    title = { Text("Screen Recording Notice") },
+                    text = {
+                        Text(
+                            "• ScreenTrack captures your screen to analyze your emotional wellbeing\n\n" +
+                            "• All analysis happens entirely on your device — nothing is sent to any server\n\n" +
+                            "• No screenshots are stored, only the result (emotion, sentiment score)\n\n" +
+                            "• You can stop recording at any time from the Home screen",
+                            color = TextSecondary
+                        )
+                    },
+                    containerColor = DarkSurface,
+                    titleContentColor = TextPrimary,
+                    textContentColor = TextSecondary
+                )
             }
 
             if (showClearDialog) {
@@ -1162,11 +1171,9 @@ private fun InsightsScreen(
                         Text("Period Comparison", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = TextPrimary)
                         Text("This ${selectedRange.label} vs previous", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                         if (comparison.capturesDelta != null) {
-                            val capColor = if (comparison.capturesDelta.startsWith("+")) EmotionJoy else EmotionAnger
                             SummaryRow("Captures change", comparison.capturesDelta)
                         }
                         if (comparison.sentimentDelta != null) {
-                            val sentColor = if (comparison.sentimentDelta.startsWith("+")) EmotionJoy else EmotionAnger
                             SummaryRow("Sentiment change", comparison.sentimentDelta)
                         }
                         if (comparison.typesDelta != null) {
@@ -1190,9 +1197,6 @@ private fun InsightsScreen(
 @Composable
 private fun SettingsScreen(
     paddingValues: PaddingValues,
-    connectionStatus: String?,
-    isTestingConnection: Boolean,
-    onTestConnection: () -> Unit,
     jpegQuality: Int,
     onJpegQualityChange: (Int) -> Unit,
     qualityError: String?,
@@ -1221,37 +1225,6 @@ private fun SettingsScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        item {
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = DarkSurface)
-            ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SectionHeader("Connection")
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedButton(
-                            onClick = onTestConnection,
-                            enabled = !isTestingConnection,
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentTeal)
-                        ) {
-                            Text(if (isTestingConnection) "Testing..." else "Test Connection")
-                        }
-                        connectionStatus?.let {
-                            val statusColor = if (it == "Connected") EmotionJoy else ErrorCoral
-                            Surface(shape = RoundedCornerShape(8.dp), color = statusColor.copy(alpha = 0.15f)) {
-                                Text(it, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = statusColor)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
         item {
             Card(
                 shape = RoundedCornerShape(16.dp),
@@ -1536,16 +1509,3 @@ private fun formatRelativeTime(timestampMs: Long): String {
 
 private fun formatPercent(value: Double): String = "${(value * 100).toInt()}%"
 
-private suspend fun testBackendConnection(client: OkHttpClient, backendUrl: String): String {
-    val url = backendUrl.trimEnd('/') + "/api/health"
-    return withContext(Dispatchers.IO) {
-        try {
-            val request = Request.Builder().url(url).get().build()
-            client.newCall(request).execute().use { response ->
-                if (response.isSuccessful) "Connected" else "HTTP ${response.code}"
-            }
-        } catch (ex: Exception) {
-            "Failed: ${ex.message ?: "Unknown error"}"
-        }
-    }
-}

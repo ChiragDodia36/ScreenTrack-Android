@@ -1,7 +1,5 @@
 package com.chiragdodia.screentrack
 
-import kotlin.math.roundToInt
-
 data class SummaryStats(
     val avgSentiment: Double,
     val dominantEmotion: String,
@@ -35,9 +33,4 @@ object SuggestionEngine {
         }
     }
 
-    fun formatSummary(stats: SummaryStats): String {
-        val sentiment = (stats.avgSentiment * 100).roundToInt()
-        val negative = (stats.negativeRatio * 100).roundToInt()
-        return "Avg sentiment: $sentiment, dominant emotion: ${stats.dominantEmotion}, top content: ${stats.topContentType}, negative: $negative%"
-    }
 }
