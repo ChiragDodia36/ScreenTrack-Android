@@ -36,5 +36,9 @@
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
 
+        <receiver
+            android:name=".SurveyReminderReceiver"
+            android:exported="false" />
+
     </application>
 </manifest>

@@ -162,6 +162,8 @@ class MainActivity : ComponentActivity() {
 
         val prefs = getSharedPreferences("screentrack_prefs", Context.MODE_PRIVATE)
 
+        SurveyReminder.schedule(this)
+
         setContent {
             val recentResults by viewModel.recentResults.collectAsState()
             val latestResult by viewModel.latestResult.collectAsState()
@@ -371,6 +373,15 @@ class MainActivity : ComponentActivity() {
                                     }
                                     exportLauncher.launch("screentrack-report.pdf")
                                 },
+                                onOpenSurvey = {
+                                    startActivity(
+                                        android.content.Intent(
+                                            android.content.Intent.ACTION_VIEW,
+                                            android.net.Uri.parse(SurveyReminder.FORM_URL)
+                                        )
+                                    )
+                                },
+                                onTestReminder = { SurveyReminder.showNow(this@MainActivity) },
                                 onClearData = { showClearDialog = true }
                             )
                         }
@@ -1212,6 +1223,8 @@ private fun SettingsScreen(
     pauseWhenScreenOff: Boolean,
     onPauseWhenScreenOffChange: (Boolean) -> Unit,
     onExportPdf: (Int) -> Unit,
+    onOpenSurvey: () -> Unit,
+    onTestReminder: () -> Unit,
     onClearData: () -> Unit
 ) {
     val textFieldColors = OutlinedTextFieldDefaults.colors(
@@ -1315,6 +1328,22 @@ private fun SettingsScreen(
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentTeal)
                         ) { Text("14 Days", style = MaterialTheme.typography.labelSmall) }
+                    }
+                    Button(
+                        onClick = onOpenSurvey,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentTeal)
+                    ) {
+                        Text("Fill Out Survey")
+                    }
+                    OutlinedButton(
+                        onClick = onTestReminder,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentTeal)
+                    ) {
+                        Text("Send Test Survey Reminder")
                     }
                     OutlinedButton(
                         onClick = onClearData,
