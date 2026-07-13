@@ -13,8 +13,8 @@ import java.util.Calendar
  */
 object SurveyReminder {
 
-    // ponytail: demo form on Firebase Hosting. Swap for Krista's Google Form once it exists.
-    const val FORM_URL = "https://screentrack-study-2026.web.app"
+    // Study daily check-in Google Form (requires Google sign-in; transfer ownership to Krista).
+    const val FORM_URL = "https://forms.gle/QoT24QkLLNx449hb7"
 
     private const val REMINDER_HOUR = 20 // 8 PM local
     private const val REQUEST_CODE = 3001
