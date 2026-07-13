@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ScreenTrack Daily Check-in</title>
+<style>
+  :root { --teal:#1b9e8f; --bg:#0f1115; --card:#1a1e27; --text:#f3f4f6; --muted:#9aa3b2; --line:#2b303c; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,Segoe UI,Roboto,sans-serif; line-height:1.5; }
+  .wrap { max-width:640px; margin:0 auto; padding:24px 18px 64px; }
+  h1 { font-size:1.5rem; margin:.2em 0; }
+  .sub { color:var(--muted); margin-bottom:24px; }
+  .demo { background:#3a2a10; color:#ffcf8f; border-radius:10px; padding:10px 14px; font-size:.85rem; margin-bottom:24px; }
+  .q { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px 18px; margin-bottom:16px; }
+  .q label.main { display:block; font-weight:600; margin-bottom:12px; }
+  .opt { display:block; padding:8px 0; color:var(--text); cursor:pointer; }
+  .opt input { margin-right:10px; accent-color:var(--teal); }
+  input[type=text], input[type=file] { width:100%; padding:10px; border-radius:10px; border:1px solid var(--line); background:#12151c; color:var(--text); }
+  .scale { display:flex; gap:6px; flex-wrap:wrap; }
+  .scale label { flex:1; min-width:56px; text-align:center; border:1px solid var(--line); border-radius:10px; padding:10px 4px; cursor:pointer; }
+  .scale input { display:block; margin:4px auto 0; accent-color:var(--teal); }
+  button { width:100%; background:var(--teal); color:#fff; border:0; border-radius:12px; padding:15px; font-size:1rem; font-weight:600; cursor:pointer; margin-top:8px; }
+  #done { display:none; text-align:center; padding:40px 0; }
+  #done h2 { color:var(--teal); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="form">
+    <h1>Daily Check-in</h1>
+    <p class="sub">Social Media Usage & Mental Health study · takes ~1 minute</p>
+    <div class="demo">⚠️ Demo form — responses are not saved. The real study form will collect data.</div>
+
+    <div class="q">
+      <label class="main">Participant ID</label>
+      <input type="text" placeholder="e.g. P001" />
+    </div>
+
+    <div class="q">
+      <label class="main">Overall mood today</label>
+      <div class="scale">
+        <label>1<input type="radio" name="mood" /></label>
+        <label>2<input type="radio" name="mood" /></label>
+        <label>3<input type="radio" name="mood" /></label>
+        <label>4<input type="radio" name="mood" /></label>
+        <label>5<input type="radio" name="mood" /></label>
+        <label>6<input type="radio" name="mood" /></label>
+        <label>7<input type="radio" name="mood" /></label>
+      </div>
+    </div>
+
+    <div class="q">
+      <label class="main">Little interest or pleasure in doing things (today)</label>
+      <label class="opt"><input type="radio" name="q1" />Not at all</label>
+      <label class="opt"><input type="radio" name="q1" />Several times</label>
+      <label class="opt"><input type="radio" name="q1" />More than half the day</label>
+      <label class="opt"><input type="radio" name="q1" />Nearly all day</label>
+    </div>
+
+    <div class="q">
+      <label class="main">Felt down, depressed, or hopeless (today)</label>
+      <label class="opt"><input type="radio" name="q2" />Not at all</label>
+      <label class="opt"><input type="radio" name="q2" />Several times</label>
+      <label class="opt"><input type="radio" name="q2" />More than half the day</label>
+      <label class="opt"><input type="radio" name="q2" />Nearly all day</label>
+    </div>
+
+    <div class="q">
+      <label class="main">Felt nervous, anxious, or on edge (today)</label>
+      <label class="opt"><input type="radio" name="q3" />Not at all</label>
+      <label class="opt"><input type="radio" name="q3" />Several times</label>
+      <label class="opt"><input type="radio" name="q3" />More than half the day</label>
+      <label class="opt"><input type="radio" name="q3" />Nearly all day</label>
+    </div>
+
+    <div class="q">
+      <label class="main">After using social media today, I felt</label>
+      <label class="opt"><input type="radio" name="q4" />Better</label>
+      <label class="opt"><input type="radio" name="q4" />About the same</label>
+      <label class="opt"><input type="radio" name="q4" />Worse</label>
+    </div>
+
+    <div class="q">
+      <label class="main">Upload your ScreenTrack PDF report (weekly)</label>
+      <input type="file" accept="application/pdf" />
+    </div>
+
+    <button onclick="document.getElementById('form').style.display='none';document.getElementById('done').style.display='block';window.scrollTo(0,0);">Submit</button>
+  </div>
+
+  <div id="done">
+    <h2>✓ Thanks!</h2>
+    <p class="sub">Your check-in was recorded (demo — not saved).</p>
+  </div>
+</div>
+</body>
+</html>

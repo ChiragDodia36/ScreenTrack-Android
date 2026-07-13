@@ -32,6 +32,9 @@ class CaptureViewModel(
     val isRunning: StateFlow<Boolean> = statusStore.isRunning
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
+    val isPaused: StateFlow<Boolean> = statusStore.isPaused
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     val lastError: StateFlow<String?> = statusStore.lastError
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 

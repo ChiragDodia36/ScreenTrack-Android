@@ -4,8 +4,6 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.kapt")
-    id("com.google.gms.google-services")
-    id("com.google.firebase.crashlytics")
 }
 
 // Load keystore properties if available
@@ -18,23 +16,15 @@ val keystoreProperties = Properties().apply {
 
 android {
     namespace = "com.chiragdodia.screentrack"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.chiragdodia.screentrack"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        targetSdk = 35
+        versionCode = 6
+        versionName = "1.1.3"
 
-        val backendUrl = keystoreProperties.getProperty("BACKEND_URL")
-            ?: System.getenv("BACKEND_URL")
-            ?: ""
-        val backendApiKey = keystoreProperties.getProperty("BACKEND_API_KEY")
-            ?: System.getenv("BACKEND_API_KEY")
-            ?: ""
-        buildConfigField("String", "BACKEND_URL", "\"$backendUrl\"")
-        buildConfigField("String", "BACKEND_API_KEY", "\"$backendApiKey\"")
     }
 
     signingConfigs {
@@ -116,9 +106,8 @@ dependencies {
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.google.mlkit:text-recognition:16.0.0")
+    implementation("com.google.mlkit:face-detection:16.1.7")
 
-    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
-    implementation("com.google.firebase:firebase-crashlytics-ktx")
-    implementation("com.google.firebase:firebase-analytics-ktx")
+    testImplementation("junit:junit:4.13.2")
 }

@@ -11,6 +11,5 @@ data class CaptureResultEntity(
     val emotionScore: Double,
     val sentiment: Double,
     val contentType: String,
-    val contentConfidence: Double,
-    val textSnippet: String
+    val contentConfidence: Double
 )

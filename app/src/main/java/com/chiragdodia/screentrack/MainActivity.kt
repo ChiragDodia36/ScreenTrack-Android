@@ -105,10 +105,7 @@ import androidx.core.content.getSystemService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import java.util.Locale
-import java.util.concurrent.TimeUnit
 
 // ── Dark Theme Colors ──
 private val DarkBackground = Color(0xFF0F1118)
@@ -165,50 +162,41 @@ class MainActivity : ComponentActivity() {
 
         val prefs = getSharedPreferences("screentrack_prefs", Context.MODE_PRIVATE)
 
+        SurveyReminder.schedule(this)
+
         setContent {
             val recentResults by viewModel.recentResults.collectAsState()
             val latestResult by viewModel.latestResult.collectAsState()
             val isRunning by viewModel.isRunning.collectAsState()
+            val isPaused by viewModel.isPaused.collectAsState()
             val lastError by viewModel.lastError.collectAsState()
             val lastUploadAt by viewModel.lastUploadAt.collectAsState()
             val selectedRange by viewModel.selectedTimeRange.collectAsState()
 
             val intervalSeconds = 15
             val retentionDays = 30
-            var jpegQuality by remember { mutableStateOf(prefs.getInt("jpeg_quality", 65)) }
             var maxDimension by remember { mutableStateOf(prefs.getInt("max_dimension", 720)) }
             var pauseWhenScreenOff by remember { mutableStateOf(prefs.getBoolean("pause_screen_off", true)) }
 
             var showClearDialog by remember { mutableStateOf(false) }
+            var showConsentDialog by remember { mutableStateOf(false) }
             var currentPage by remember { mutableStateOf(AppPage.Home) }
-            var connectionStatus by remember { mutableStateOf<String?>(null) }
-            var isTestingConnection by remember { mutableStateOf(false) }
 
             val coroutineScope = rememberCoroutineScope()
-            val httpClient = remember {
-                OkHttpClient.Builder()
-                    .callTimeout(20, TimeUnit.SECONDS)
-                    .connectTimeout(15, TimeUnit.SECONDS)
-                    .readTimeout(20, TimeUnit.SECONDS)
-                    .retryOnConnectionFailure(true)
-                    .build()
-            }
 
-            val qualityError = validateRange(jpegQuality, 10, 100, "JPEG quality")
             val dimensionError = validateRange(maxDimension, 240, 2160, "Max dimension")
-            val hasErrors = listOf(qualityError, dimensionError).any { it != null }
+            val hasErrors = listOf(dimensionError).any { it != null }
 
             val captureLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.StartActivityForResult()
             ) { result ->
                 if (result.resultCode == Activity.RESULT_OK && result.data != null) {
-                    savePrefs(prefs, intervalSeconds, jpegQuality, maxDimension, retentionDays, pauseWhenScreenOff)
+                    savePrefs(prefs, intervalSeconds, maxDimension, retentionDays, pauseWhenScreenOff)
                     ScreenCaptureService.start(
                         context = this,
                         resultCode = result.resultCode,
                         data = result.data!!,
                         intervalMs = intervalSeconds.coerceIn(1, 60) * 1000L,
-                        jpegQuality = jpegQuality.coerceIn(10, 100),
                         maxDimension = maxDimension.coerceIn(240, 2160),
                         retentionDays = retentionDays.coerceIn(1, 90).toLong(),
                         pauseWhenScreenOff = pauseWhenScreenOff
@@ -217,6 +205,10 @@ class MainActivity : ComponentActivity() {
             }
 
             val notificationPermissionLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.RequestPermission()
+            ) { }
+
+            val phoneStatePermissionLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.RequestPermission()
             ) { }
 
@@ -245,6 +237,7 @@ class MainActivity : ComponentActivity() {
                 if (Build.VERSION.SDK_INT >= 33) {
                     notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
+                phoneStatePermissionLauncher.launch(Manifest.permission.READ_PHONE_STATE)
             }
 
             val mainHaptic = LocalHapticFeedback.current
@@ -329,14 +322,21 @@ class MainActivity : ComponentActivity() {
                                 latestResult = latestResult,
                                 lastUploadAt = lastUploadAt,
                                 onStartCapture = {
-                                    val projectionManager = getSystemService<MediaProjectionManager>()
-                                    if (projectionManager != null) {
-                                        captureLauncher.launch(projectionManager.createScreenCaptureIntent())
+                                    if (!prefs.getBoolean("consent_given", false)) {
+                                        showConsentDialog = true
+                                    } else {
+                                        val projectionManager = getSystemService<MediaProjectionManager>()
+                                        projectionManager?.let { captureLauncher.launch(it.createScreenCaptureIntent()) }
                                     }
                                 },
                                 onStopCapture = { ScreenCaptureService.stop(this@MainActivity) },
                                 canStartCapture = !isRunning && !hasErrors,
                                 canStopCapture = isRunning,
+                                isPaused = isPaused,
+                                onPauseToggle = {
+                                    if (isPaused) ScreenCaptureService.resume(this@MainActivity)
+                                    else ScreenCaptureService.pause(this@MainActivity)
+                                },
                                 filteredResults = filteredResults,
                                 selectedRange = selectedRange,
                                 onViewTrends = { currentPage = AppPage.Trends }
@@ -358,20 +358,6 @@ class MainActivity : ComponentActivity() {
                             )
                             AppPage.Settings -> SettingsScreen(
                                 paddingValues = paddingValues,
-                                connectionStatus = connectionStatus,
-                                isTestingConnection = isTestingConnection,
-                                onTestConnection = {
-                                    connectionStatus = null
-                                    isTestingConnection = true
-                                    coroutineScope.launch {
-                                        val result = testBackendConnection(httpClient, BuildConfig.BACKEND_URL)
-                                        connectionStatus = result
-                                        isTestingConnection = false
-                                    }
-                                },
-                                jpegQuality = jpegQuality,
-                                onJpegQualityChange = { jpegQuality = it },
-                                qualityError = qualityError,
                                 maxDimension = maxDimension,
                                 onMaxDimensionChange = { maxDimension = it },
                                 dimensionError = dimensionError,
@@ -387,11 +373,50 @@ class MainActivity : ComponentActivity() {
                                     }
                                     exportLauncher.launch("screentrack-report.pdf")
                                 },
+                                onOpenSurvey = {
+                                    startActivity(
+                                        android.content.Intent(
+                                            android.content.Intent.ACTION_VIEW,
+                                            android.net.Uri.parse(SurveyReminder.FORM_URL)
+                                        )
+                                    )
+                                },
+                                onTestReminder = { SurveyReminder.showNow(this@MainActivity) },
                                 onClearData = { showClearDialog = true }
                             )
                         }
                     }
                 }
+            }
+
+            if (showConsentDialog) {
+                AlertDialog(
+                    onDismissRequest = { showConsentDialog = false },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            prefs.edit().putBoolean("consent_given", true).apply()
+                            showConsentDialog = false
+                            val projectionManager = getSystemService<MediaProjectionManager>()
+                            projectionManager?.let { captureLauncher.launch(it.createScreenCaptureIntent()) }
+                        }) { Text("I Understand, Continue", color = AccentTeal) }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showConsentDialog = false }) { Text("Cancel") }
+                    },
+                    title = { Text("Screen Recording Notice") },
+                    text = {
+                        Text(
+                            "• ScreenTrack captures your screen to analyze your emotional wellbeing\n\n" +
+                            "• All analysis happens entirely on your device — nothing is sent to any server\n\n" +
+                            "• No screenshots are stored, only the result (emotion, sentiment score)\n\n" +
+                            "• You can stop recording at any time from the Home screen",
+                            color = TextSecondary
+                        )
+                    },
+                    containerColor = DarkSurface,
+                    titleContentColor = TextPrimary,
+                    textContentColor = TextSecondary
+                )
             }
 
             if (showClearDialog) {
@@ -419,14 +444,12 @@ class MainActivity : ComponentActivity() {
     private fun savePrefs(
         prefs: android.content.SharedPreferences,
         intervalSeconds: Int,
-        jpegQuality: Int,
         maxDimension: Int,
         retentionDays: Int,
         pauseWhenScreenOff: Boolean
     ) {
         prefs.edit()
             .putInt("interval_seconds", intervalSeconds)
-            .putInt("jpeg_quality", jpegQuality)
             .putInt("max_dimension", maxDimension)
             .putInt("retention_days", retentionDays)
             .putBoolean("pause_screen_off", pauseWhenScreenOff)
@@ -578,6 +601,8 @@ private fun HomeScreen(
     onStopCapture: () -> Unit,
     canStartCapture: Boolean,
     canStopCapture: Boolean,
+    isPaused: Boolean,
+    onPauseToggle: () -> Unit,
     filteredResults: List<CaptureResultEntity>,
     selectedRange: TimeRangeOption,
     onViewTrends: () -> Unit
@@ -672,15 +697,6 @@ private fun HomeScreen(
                         ) {
                             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 SummaryRow("Content", "${latestResult.contentType} (${formatScore(latestResult.contentConfidence)})")
-                                if (latestResult.textSnippet.isNotBlank()) {
-                                    Text(
-                                        latestResult.textSnippet,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = TextSecondary,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
                             }
                         }
                     } else {
@@ -722,6 +738,19 @@ private fun HomeScreen(
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = ErrorCoral)
                 ) {
                     Text("Stop", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        if (isRunning) {
+            item {
+                OutlinedButton(
+                    onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); onPauseToggle() },
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentTeal)
+                ) {
+                    Text(if (isPaused) "Resume Collection" else "Pause Collection", fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -1162,11 +1191,9 @@ private fun InsightsScreen(
                         Text("Period Comparison", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = TextPrimary)
                         Text("This ${selectedRange.label} vs previous", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                         if (comparison.capturesDelta != null) {
-                            val capColor = if (comparison.capturesDelta.startsWith("+")) EmotionJoy else EmotionAnger
                             SummaryRow("Captures change", comparison.capturesDelta)
                         }
                         if (comparison.sentimentDelta != null) {
-                            val sentColor = if (comparison.sentimentDelta.startsWith("+")) EmotionJoy else EmotionAnger
                             SummaryRow("Sentiment change", comparison.sentimentDelta)
                         }
                         if (comparison.typesDelta != null) {
@@ -1190,18 +1217,14 @@ private fun InsightsScreen(
 @Composable
 private fun SettingsScreen(
     paddingValues: PaddingValues,
-    connectionStatus: String?,
-    isTestingConnection: Boolean,
-    onTestConnection: () -> Unit,
-    jpegQuality: Int,
-    onJpegQualityChange: (Int) -> Unit,
-    qualityError: String?,
     maxDimension: Int,
     onMaxDimensionChange: (Int) -> Unit,
     dimensionError: String?,
     pauseWhenScreenOff: Boolean,
     onPauseWhenScreenOffChange: (Boolean) -> Unit,
     onExportPdf: (Int) -> Unit,
+    onOpenSurvey: () -> Unit,
+    onTestReminder: () -> Unit,
     onClearData: () -> Unit
 ) {
     val textFieldColors = OutlinedTextFieldDefaults.colors(
@@ -1227,37 +1250,6 @@ private fun SettingsScreen(
                 colors = CardDefaults.cardColors(containerColor = DarkSurface)
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SectionHeader("Connection")
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedButton(
-                            onClick = onTestConnection,
-                            enabled = !isTestingConnection,
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentTeal)
-                        ) {
-                            Text(if (isTestingConnection) "Testing..." else "Test Connection")
-                        }
-                        connectionStatus?.let {
-                            val statusColor = if (it == "Connected") EmotionJoy else ErrorCoral
-                            Surface(shape = RoundedCornerShape(8.dp), color = statusColor.copy(alpha = 0.15f)) {
-                                Text(it, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = statusColor)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        item {
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = DarkSurface)
-            ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SectionHeader("Capture Settings")
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1275,17 +1267,6 @@ private fun SettingsScreen(
                             )
                         }
                     }
-                    OutlinedTextField(
-                        value = jpegQuality.toString(),
-                        onValueChange = { onJpegQualityChange(it.toIntOrNull() ?: jpegQuality) },
-                        label = { Text("JPEG Quality (10-100)") },
-                        singleLine = true,
-                        isError = qualityError != null,
-                        supportingText = { qualityError?.let { Text(it) } },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = textFieldColors,
-                        shape = RoundedCornerShape(12.dp)
-                    )
                     OutlinedTextField(
                         value = maxDimension.toString(),
                         onValueChange = { onMaxDimensionChange(it.toIntOrNull() ?: maxDimension) },
@@ -1347,6 +1328,22 @@ private fun SettingsScreen(
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentTeal)
                         ) { Text("14 Days", style = MaterialTheme.typography.labelSmall) }
+                    }
+                    Button(
+                        onClick = onOpenSurvey,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentTeal)
+                    ) {
+                        Text("Fill Out Survey")
+                    }
+                    OutlinedButton(
+                        onClick = onTestReminder,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentTeal)
+                    ) {
+                        Text("Send Test Survey Reminder")
                     }
                     OutlinedButton(
                         onClick = onClearData,
@@ -1536,16 +1533,3 @@ private fun formatRelativeTime(timestampMs: Long): String {
 
 private fun formatPercent(value: Double): String = "${(value * 100).toInt()}%"
 
-private suspend fun testBackendConnection(client: OkHttpClient, backendUrl: String): String {
-    val url = backendUrl.trimEnd('/') + "/api/health"
-    return withContext(Dispatchers.IO) {
-        try {
-            val request = Request.Builder().url(url).get().build()
-            client.newCall(request).execute().use { response ->
-                if (response.isSuccessful) "Connected" else "HTTP ${response.code}"
-            }
-        } catch (ex: Exception) {
-            "Failed: ${ex.message ?: "Unknown error"}"
-        }
-    }
-}

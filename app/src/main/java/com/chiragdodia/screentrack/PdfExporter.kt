@@ -21,12 +21,11 @@ object PdfExporter {
 
         // ── Page 1: Header + Stats + Emotion bars ──
         val page1 = document.startPage(PdfDocument.PageInfo.Builder(PAGE_W.toInt(), PAGE_H.toInt(), 1).create())
-        var y = drawPage1(page1.canvas, label, items)
+        drawPage1(page1.canvas, label, items)
         document.finishPage(page1)
 
-        // ── Page 2: Content bars + Suggestion (only if content exists) ──
         val page2 = document.startPage(PdfDocument.PageInfo.Builder(PAGE_W.toInt(), PAGE_H.toInt(), 2).create())
-        drawPage2(page2.canvas, label, items)
+        drawPage2(page2.canvas, items)
         document.finishPage(page2)
 
         val output = java.io.ByteArrayOutputStream()
@@ -103,7 +102,7 @@ object PdfExporter {
         return y
     }
 
-    private fun drawPage2(canvas: Canvas, label: String, items: List<CaptureResultEntity>) {
+    private fun drawPage2(canvas: Canvas, items: List<CaptureResultEntity>) {
         var y = MARGIN + 10f
 
         val sectionPaint = boldPaint(14f)

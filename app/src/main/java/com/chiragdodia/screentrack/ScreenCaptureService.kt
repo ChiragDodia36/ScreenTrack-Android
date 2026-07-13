@@ -15,8 +15,6 @@ import android.hardware.display.VirtualDisplay
 import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
@@ -24,12 +22,10 @@ import android.os.IBinder
 import android.os.SystemClock
 import android.view.Display
 import androidx.core.app.NotificationCompat
-import com.google.firebase.analytics.FirebaseAnalytics
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import java.io.ByteArrayOutputStream
 
 class ScreenCaptureService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -41,16 +37,21 @@ class ScreenCaptureService : Service() {
     private var handler: Handler? = null
 
     private var intervalMs: Long = 5000L
-    private var jpegQuality: Int = 65
     private var maxDimension: Int = 720
-    private val backendUrl: String = BuildConfig.BACKEND_URL
-    private val apiKey: String = BuildConfig.BACKEND_API_KEY
     private var retentionDays: Long = 30L
     private var pauseWhenScreenOff: Boolean = true
 
+    private val analyzer = OnDeviceAnalyzer()
+
     private var lastCaptureAt: Long = 0L
-    private var isPaused: Boolean = false
+    private var pauseState = PauseState()
+    private var callMonitor: CallMonitor? = null
     private var screenReceiver: BroadcastReceiver? = null
+
+    private fun updatePause(transform: (PauseState) -> PauseState) {
+        pauseState = transform(pauseState)
+        ServiceStatusStore.getInstance(applicationContext).setPaused(pauseState.isPaused)
+    }
     private var lastSuggestionAt: Long = 0L
     private var consecutiveErrors: Int = 0
 
@@ -61,12 +62,16 @@ class ScreenCaptureService : Service() {
             stopSelfSafely()
             return START_NOT_STICKY
         }
+        when (intent?.action) {
+            ACTION_PAUSE -> { updatePause { it.copy(manual = true) }; return START_STICKY }
+            ACTION_RESUME -> { updatePause { it.copy(manual = false) }; return START_STICKY }
+        }
 
         val resultCode = intent?.getIntExtra(EXTRA_RESULT_CODE, 0) ?: 0
+        @Suppress("DEPRECATION")
         val data = intent?.getParcelableExtra<Intent>(EXTRA_PROJECTION_DATA)
 
         intervalMs = (intent?.getLongExtra(EXTRA_INTERVAL_MS, intervalMs) ?: intervalMs).coerceIn(1000L, 60_000L)
-        jpegQuality = (intent?.getIntExtra(EXTRA_JPEG_QUALITY, jpegQuality) ?: jpegQuality).coerceIn(10, 100)
         maxDimension = (intent?.getIntExtra(EXTRA_MAX_DIMENSION, maxDimension) ?: maxDimension).coerceIn(240, 2160)
         retentionDays = intent?.getLongExtra(EXTRA_RETENTION_DAYS, retentionDays) ?: retentionDays
         pauseWhenScreenOff = intent?.getBooleanExtra(EXTRA_PAUSE_SCREEN_OFF, pauseWhenScreenOff) ?: pauseWhenScreenOff
@@ -76,16 +81,10 @@ class ScreenCaptureService : Service() {
             return START_NOT_STICKY
         }
 
-        // Validate URL — blank means backend was not configured in keystore.properties
-        if (backendUrl.isBlank()) {
-            ServiceStatusStore.getInstance(applicationContext).setLastError("Backend URL not configured")
-            stopSelfSafely()
-            return START_NOT_STICKY
-        }
-        try {
-            java.net.URL(backendUrl)
-        } catch (e: java.net.MalformedURLException) {
-            ServiceStatusStore.getInstance(applicationContext).setLastError("Invalid backend URL")
+        val consentGiven = getSharedPreferences("screentrack_prefs", MODE_PRIVATE)
+            .getBoolean("consent_given", false)
+        if (!consentGiven) {
+            ServiceStatusStore.getInstance(applicationContext).setLastError("Consent not given")
             stopSelfSafely()
             return START_NOT_STICKY
         }
@@ -96,17 +95,20 @@ class ScreenCaptureService : Service() {
             setLastError(null)
         }
 
-        FirebaseAnalytics.getInstance(this).logEvent("capture_started", null)
         startProjection(resultCode, data)
         registerScreenReceiver()
+        callMonitor = CallMonitor(applicationContext) { active ->
+            updatePause { it.copy(onCall = active) }
+        }.also { it.start() }
         return START_STICKY
     }
 
     override fun onDestroy() {
+        callMonitor?.stop()
         unregisterScreenReceiver()
         stopProjection()
+        analyzer.close()
         ServiceStatusStore.getInstance(applicationContext).setRunning(false)
-        FirebaseAnalytics.getInstance(this).logEvent("capture_stopped", null)
         super.onDestroy()
     }
 
@@ -139,7 +141,7 @@ class ScreenCaptureService : Service() {
                 return@setOnImageAvailableListener
             }
 
-            if (isPaused) {
+            if (pauseState.isPaused) {
                 reader.acquireLatestImage()?.close()
                 return@setOnImageAvailableListener
             }
@@ -155,49 +157,27 @@ class ScreenCaptureService : Service() {
                     val scaled = ImageUtils.scaleToMaxDimension(bitmap, maxDimension)
                     bitmap.recycle()
 
-                    val outputStream = ByteArrayOutputStream()
-                    val safeQuality = jpegQuality.coerceIn(10, 100)
-                    scaled.compress(android.graphics.Bitmap.CompressFormat.JPEG, safeQuality, outputStream)
+                    val result = analyzer.analyze(scaled)
                     scaled.recycle()
 
-                    val bytes = outputStream.toByteArray()
-                    if (!isNetworkAvailable()) {
-                        ServiceStatusStore.getInstance(applicationContext)
-                            .setLastError("No network connection")
-                        return@launch
+                    val repository = CaptureRepository.getInstance(applicationContext)
+                    repository.addResult(
+                        CaptureResultEntity(
+                            timestampMs = System.currentTimeMillis(),
+                            emotion = result.emotion,
+                            emotionScore = result.emotionConfidence,
+                            sentiment = result.sentiment,
+                            contentType = result.contentType,
+                            contentConfidence = result.contentConfidence
+                        ),
+                        retentionDays = retentionDays
+                    )
+                    ServiceStatusStore.getInstance(applicationContext).apply {
+                        setLastError(null)
+                        setLastUploadAt(System.currentTimeMillis())
                     }
-
-                    val result = FrameUploader.uploadFrame(bytes, backendUrl, apiKey)
-                    if (result.analysis != null) {
-                        val bundle = android.os.Bundle().apply {
-                            putString("emotion", result.analysis.emotion)
-                            putString("content_type", result.analysis.contentType)
-                        }
-                        FirebaseAnalytics.getInstance(this@ScreenCaptureService).logEvent("analysis_received", bundle)
-                        val repository = CaptureRepository.getInstance(applicationContext)
-                        repository.addResult(
-                            CaptureResultEntity(
-                                timestampMs = System.currentTimeMillis(),
-                                emotion = result.analysis.emotion,
-                                emotionScore = result.analysis.emotionConfidence,
-                                sentiment = result.analysis.sentimentScore,
-                                contentType = result.analysis.contentType,
-                                contentConfidence = result.analysis.contentConfidence,
-                                textSnippet = result.analysis.textPreview
-                            ),
-                            retentionDays = retentionDays
-                        )
-                        ServiceStatusStore.getInstance(applicationContext).apply {
-                            setLastError(null)
-                            setLastUploadAt(System.currentTimeMillis())
-                        }
-                        consecutiveErrors = 0
-                        maybeNotify(repository)
-                    } else if (result.error != null) {
-                        consecutiveErrors++
-                        ServiceStatusStore.getInstance(applicationContext)
-                            .setLastError("${result.error} (errors: $consecutiveErrors)")
-                    }
+                    consecutiveErrors = 0
+                    maybeNotify(repository)
                 } catch (e: Exception) {
                     consecutiveErrors++
                     ServiceStatusStore.getInstance(applicationContext)
@@ -245,8 +225,8 @@ class ScreenCaptureService : Service() {
         screenReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 when (intent?.action) {
-                    Intent.ACTION_SCREEN_OFF -> isPaused = true
-                    Intent.ACTION_USER_PRESENT -> isPaused = false
+                    Intent.ACTION_SCREEN_OFF -> updatePause { it.copy(screenOff = true) }
+                    Intent.ACTION_USER_PRESENT -> updatePause { it.copy(screenOff = false) }
                 }
             }
         }
@@ -262,14 +242,7 @@ class ScreenCaptureService : Service() {
             unregisterReceiver(it)
             screenReceiver = null
         }
-        isPaused = false
-    }
-
-    private fun isNetworkAvailable(): Boolean {
-        val manager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val network = manager.activeNetwork ?: return false
-        val capabilities = manager.getNetworkCapabilities(network) ?: return false
-        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        updatePause { PauseState() }
     }
 
     private suspend fun maybeNotify(repository: CaptureRepository) {
@@ -324,14 +297,15 @@ class ScreenCaptureService : Service() {
 
     companion object {
         private const val NOTIFICATION_ID = 1001
-        private const val ACTION_STOP = "com.screentrack.mobile.action.STOP"
+        private const val ACTION_STOP = "com.chiragdodia.screentrack.action.STOP"
+        const val ACTION_PAUSE = "com.chiragdodia.screentrack.action.PAUSE"
+        const val ACTION_RESUME = "com.chiragdodia.screentrack.action.RESUME"
         private const val NOTIFICATION_COOLDOWN_MS = 15 * 60 * 1000L
         private const val ONE_HOUR_MS = 60 * 60 * 1000L
 
         private const val EXTRA_RESULT_CODE = "extra_result_code"
         private const val EXTRA_PROJECTION_DATA = "extra_projection_data"
         private const val EXTRA_INTERVAL_MS = "extra_interval_ms"
-        private const val EXTRA_JPEG_QUALITY = "extra_jpeg_quality"
         private const val EXTRA_MAX_DIMENSION = "extra_max_dimension"
         private const val EXTRA_RETENTION_DAYS = "extra_retention_days"
         private const val EXTRA_PAUSE_SCREEN_OFF = "extra_pause_screen_off"
@@ -341,7 +315,6 @@ class ScreenCaptureService : Service() {
             resultCode: Int,
             data: Intent,
             intervalMs: Long,
-            jpegQuality: Int,
             maxDimension: Int,
             retentionDays: Long,
             pauseWhenScreenOff: Boolean
@@ -350,7 +323,6 @@ class ScreenCaptureService : Service() {
                 putExtra(EXTRA_RESULT_CODE, resultCode)
                 putExtra(EXTRA_PROJECTION_DATA, data)
                 putExtra(EXTRA_INTERVAL_MS, intervalMs)
-                putExtra(EXTRA_JPEG_QUALITY, jpegQuality)
                 putExtra(EXTRA_MAX_DIMENSION, maxDimension)
                 putExtra(EXTRA_RETENTION_DAYS, retentionDays)
                 putExtra(EXTRA_PAUSE_SCREEN_OFF, pauseWhenScreenOff)
@@ -364,5 +336,11 @@ class ScreenCaptureService : Service() {
             }
             context.startService(intent)
         }
+
+        fun pause(context: Context) = context.startService(
+            Intent(context, ScreenCaptureService::class.java).apply { action = ACTION_PAUSE })
+
+        fun resume(context: Context) = context.startService(
+            Intent(context, ScreenCaptureService::class.java).apply { action = ACTION_RESUME })
     }
 }
