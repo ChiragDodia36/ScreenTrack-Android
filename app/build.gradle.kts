@@ -26,6 +26,9 @@ android {
         versionName = "1.1.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Study phones are all arm64; drop other ABIs' ONNX libs (305MB -> ~145MB).
+        ndk { abiFilters += "arm64-v8a" }
     }
 
     androidResources {

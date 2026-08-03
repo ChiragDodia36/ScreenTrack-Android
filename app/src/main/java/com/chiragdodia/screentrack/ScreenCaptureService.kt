@@ -41,7 +41,9 @@ class ScreenCaptureService : Service() {
     private var retentionDays: Long = 30L
     private var pauseWhenScreenOff: Boolean = true
 
-    private lateinit var analyzer: OnDeviceAnalyzer
+    // Built lazily on the capture background thread — never on the onStartCommand
+    // main-thread path, so startForeground() (mediaProjection FGS) fires immediately.
+    private var analyzer: OnDeviceAnalyzer? = null
 
     private var lastCaptureAt: Long = 0L
     private var pauseState = PauseState()
@@ -89,7 +91,6 @@ class ScreenCaptureService : Service() {
             return START_NOT_STICKY
         }
 
-        if (!::analyzer.isInitialized) analyzer = OnDeviceAnalyzer(applicationContext)
         startForeground(NOTIFICATION_ID, buildNotification())
         ServiceStatusStore.getInstance(applicationContext).apply {
             setRunning(true)
@@ -108,7 +109,7 @@ class ScreenCaptureService : Service() {
         callMonitor?.stop()
         unregisterScreenReceiver()
         stopProjection()
-        if (::analyzer.isInitialized) analyzer.close()
+        analyzer?.close()
         ServiceStatusStore.getInstance(applicationContext).setRunning(false)
         super.onDestroy()
     }
@@ -158,7 +159,8 @@ class ScreenCaptureService : Service() {
                     val scaled = ImageUtils.scaleToMaxDimension(bitmap, maxDimension)
                     bitmap.recycle()
 
-                    val result = analyzer.analyze(scaled)
+                    val az = analyzer ?: OnDeviceAnalyzer(applicationContext).also { analyzer = it }
+                    val result = az.analyze(scaled)
                     scaled.recycle()
 
                     val repository = CaptureRepository.getInstance(applicationContext)
