@@ -41,7 +41,7 @@ class ScreenCaptureService : Service() {
     private var retentionDays: Long = 30L
     private var pauseWhenScreenOff: Boolean = true
 
-    private val analyzer = OnDeviceAnalyzer()
+    private lateinit var analyzer: OnDeviceAnalyzer
 
     private var lastCaptureAt: Long = 0L
     private var pauseState = PauseState()
@@ -89,6 +89,7 @@ class ScreenCaptureService : Service() {
             return START_NOT_STICKY
         }
 
+        if (!::analyzer.isInitialized) analyzer = OnDeviceAnalyzer(applicationContext)
         startForeground(NOTIFICATION_ID, buildNotification())
         ServiceStatusStore.getInstance(applicationContext).apply {
             setRunning(true)
@@ -107,7 +108,7 @@ class ScreenCaptureService : Service() {
         callMonitor?.stop()
         unregisterScreenReceiver()
         stopProjection()
-        analyzer.close()
+        if (::analyzer.isInitialized) analyzer.close()
         ServiceStatusStore.getInstance(applicationContext).setRunning(false)
         super.onDestroy()
     }

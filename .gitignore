@@ -28,3 +28,10 @@ claude.md
 
 # Tooling scratch
 .firecrawl/
+
+# Emotion model conversion (dev) — large binary regenerated via tools/emotion-model/export.sh
+tools/emotion-model/.venv/
+tools/emotion-model/onnx/
+tools/emotion-model/*.log
+# The 120MB ONNX model exceeds GitHub's 100MB limit; regenerate + copy to assets locally.
+app/src/main/assets/emotion_model.onnx

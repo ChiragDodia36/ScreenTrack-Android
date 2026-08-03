@@ -25,6 +25,13 @@ android {
         versionCode = 6
         versionName = "1.1.3"
 
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    androidResources {
+        // Keep the ONNX model uncompressed so it can be memory-mapped and to
+        // avoid APK compression choking on the large asset.
+        noCompress += "onnx"
     }
 
     signingConfigs {
@@ -109,5 +116,11 @@ dependencies {
     implementation("com.google.mlkit:text-recognition:16.0.0")
     implementation("com.google.mlkit:face-detection:16.1.7")
 
+    // On-device 27-emotion model (GoEmotions RoBERTa, ONNX) + embedded tokenizer.
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
+    implementation("com.microsoft.onnxruntime:onnxruntime-extensions-android:0.13.0")
+
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
 }

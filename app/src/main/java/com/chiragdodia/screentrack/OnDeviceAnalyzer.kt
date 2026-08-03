@@ -1,5 +1,6 @@
 package com.chiragdodia.screentrack
 
+import android.content.Context
 import android.graphics.Bitmap
 import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.vision.common.InputImage
@@ -11,12 +12,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Orchestrates on-device ML (OCR + face) and delegates all decisions to the
- * pure classifiers. No screen image is ever stored or transmitted.
+ * Orchestrates on-device ML (OCR + 27-emotion model + face) and delegates all
+ * decisions to the pure classifiers. No screen image is ever stored or transmitted.
  */
-class OnDeviceAnalyzer {
+class OnDeviceAnalyzer(context: Context) {
 
     private val textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    private val emotionModel = EmotionModel(context)
 
     private val faceDetector = FaceDetection.getClient(
         FaceDetectorOptions.Builder()
@@ -32,7 +34,8 @@ class OnDeviceAnalyzer {
             Tasks.await(faceDetector.process(image)).maxByOrNull { it.smilingProbability ?: -1f }?.smilingProbability
         }.getOrNull()
 
-        val textEmotion = TextSentimentClassifier.classify(text)
+        val scores = emotionModel.scores(text)
+        val textEmotion = TextEmotion(scores, hadSignal = scores.isNotEmpty())
         val content = ContentClassifier.classify(text)
         val face = FaceSignals.fromSmilingProbability(smiling)
         AnalysisCombiner.combine(textEmotion, face, content)
@@ -41,5 +44,6 @@ class OnDeviceAnalyzer {
     fun close() {
         textRecognizer.close()
         faceDetector.close()
+        emotionModel.close()
     }
 }
