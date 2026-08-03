@@ -30,6 +30,9 @@ object ContentClassifier {
             "quiz", "assignment", "syllabus", "professor", "learn")
     )
 
+    /** Stable column order for the CSV: all categories + the "general" fallback. */
+    val CATEGORY_NAMES: List<String> = CATEGORIES.keys.toList() + "general"
+
     fun classify(text: String): ContentResult {
         if (text.isBlank()) return ContentResult("general", 1.0, hadSignal = false)
         val lower = text.lowercase()

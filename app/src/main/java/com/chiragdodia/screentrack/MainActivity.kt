@@ -213,20 +213,18 @@ class MainActivity : ComponentActivity() {
             ) { }
 
             val exportHoursState = remember { mutableStateOf(1) }
-            val exportLabelState = remember { mutableStateOf("1 Hour") }
 
             val exportLauncher = rememberLauncherForActivityResult(
-                ActivityResultContracts.CreateDocument("application/pdf")
+                ActivityResultContracts.CreateDocument("text/csv")
             ) { uri ->
                 if (uri != null) {
                     coroutineScope.launch {
                         val hours = exportHoursState.value
-                        val label = exportLabelState.value
                         val data = viewModel.loadRange(hours)
-                        val pdfBytes = PdfExporter.buildSummaryPdf("Last $label", data)
+                        val csvBytes = CsvExporter.buildHourlyCsv(data).toByteArray()
                         withContext(Dispatchers.IO) {
                             contentResolver.openOutputStream(uri)?.use { output ->
-                                output.write(pdfBytes)
+                                output.write(csvBytes)
                             }
                         }
                     }
@@ -365,13 +363,7 @@ class MainActivity : ComponentActivity() {
                                 onPauseWhenScreenOffChange = { pauseWhenScreenOff = it },
                                 onExportPdf = { hours ->
                                     exportHoursState.value = hours
-                                    exportLabelState.value = when (hours) {
-                                        1 -> "1 Hour"
-                                        24 -> "24 Hours"
-                                        168 -> "7 Days"
-                                        else -> "14 Days"
-                                    }
-                                    exportLauncher.launch("screentrack-report.pdf")
+                                    exportLauncher.launch("screentrack-report.csv")
                                 },
                                 onOpenSurvey = {
                                     startActivity(
@@ -1290,7 +1282,7 @@ private fun SettingsScreen(
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SectionHeader("Data Management")
                     Text(
-                        "Export PDF Report",
+                        "Export CSV Report",
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondary,
                         fontWeight = FontWeight.Medium
