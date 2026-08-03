@@ -169,7 +169,8 @@ class ScreenCaptureService : Service() {
                             emotionScore = result.emotionConfidence,
                             sentiment = result.sentiment,
                             contentType = result.contentType,
-                            contentConfidence = result.contentConfidence
+                            contentConfidence = result.contentConfidence,
+                            emotionScoresJson = EmotionScoresJson.encode(result.emotionScores)
                         ),
                         retentionDays = retentionDays
                     )

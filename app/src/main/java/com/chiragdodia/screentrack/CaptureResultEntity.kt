@@ -11,5 +11,6 @@ data class CaptureResultEntity(
     val emotionScore: Double,
     val sentiment: Double,
     val contentType: String,
-    val contentConfidence: Double
+    val contentConfidence: Double,
+    val emotionScoresJson: String = "{}"
 )

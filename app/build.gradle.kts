@@ -121,6 +121,7 @@ dependencies {
     implementation("com.microsoft.onnxruntime:onnxruntime-extensions-android:0.13.0")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20231013") // real org.json for JVM unit tests
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
 }
