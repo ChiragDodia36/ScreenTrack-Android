@@ -27,9 +27,14 @@
 3. Export a CSV in-app; open it; check hourly rows + 28 emotion score columns look sane.
 4. Watch for a possible **OOM when the 120 MB model loads** during the first capture (process death → START_STICKY restart → stale-consent crash). If that happens, add a try/catch around `startForeground` (stopSelf on failure) and/or reduce model footprint.
 
+## Phase 3 — DONE (code-complete, `7c0b93e`)
+- `emotion-ferplus-8` int8 ONNX (20 MB) bundled as `fer_model.onnx` (gitignored).
+- `FaceEmotionModel` (crop face → 64x64 grayscale → 8 FER emotions), `FaceEmotionMap` (8→28), `AnalysisCombiner` now blends text+face 28-score maps. `FaceSignal` removed.
+- On-device FER inference NOT yet run — part of the pending verification.
+
 ## Remaining
-- **Phase 3 (deferred):** face emotion (FER) model + 7→28 mapping + blend. Optional; only fires when a face is on screen.
-- **Phase 5 (finish):** after verification → version bump (suggest versionCode 7 / 1.2.0), release build, distribute the CSV version via Firebase.
+- **On-device verification (BLOCKED on phone):** crash fix + text model + face model + CSV, and confirm no OOM with BOTH models loaded (~140 MB of models). If OOM on restart → add try/catch around `startForeground` (stopSelf on failure) and/or make the FER model optional.
+- **Phase 5:** after verification → version bump (versionCode 7 / 1.2.0), release build, distribute the CSV version via Firebase.
 
 ## Notes
 - **Model asset is gitignored** (120 MB > GitHub 100 MB). Regenerate: `tools/emotion-model/` → `export.sh` → copy `model.int8.onnx` to `app/src/main/assets/emotion_model.onnx`. `tokenizer.onnx` (1.3 MB) is committed.
