@@ -35,3 +35,4 @@ tools/emotion-model/onnx/
 tools/emotion-model/*.log
 # The 120MB ONNX model exceeds GitHub's 100MB limit; regenerate + copy to assets locally.
 app/src/main/assets/emotion_model.onnx
+app/src/main/assets/fer_model.onnx

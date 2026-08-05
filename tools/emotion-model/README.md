@@ -21,6 +21,16 @@ pip install -r requirements.txt
 100 MB limit). A fresh clone must run steps 1–4 before building. `tokenizer.onnx`
 (1.3 MB) is committed.
 
+## Face model (FER) — Phase 3
+`emotion-ferplus-8` (ONNX Model Zoo, 8 emotions, 1x1x64x64 grayscale input).
+```bash
+curl -sL -o fer/emotion-ferplus-8.onnx \
+  https://huggingface.co/onnxmodelzoo/emotion-ferplus-8/resolve/main/emotion-ferplus-8.onnx
+python fer/verify_fer.py   # verifies + writes emotion-ferplus-8.int8.onnx (~20MB)
+cp fer/emotion-ferplus-8.int8.onnx ../../app/src/main/assets/fer_model.onnx
+```
+`fer_model.onnx` is **gitignored** — re-download + quantize on a fresh clone.
+
 ## Spike findings
 - int8 model size: **120 MB** (fp32 was 476 MB) — under the 150 MB gate. ✓
 - Python accuracy: excellent — love 0.96, fear 0.91, surprise 0.86, pride/admiration correct. ✓

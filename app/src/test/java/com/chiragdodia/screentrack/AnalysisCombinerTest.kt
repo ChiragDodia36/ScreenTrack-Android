@@ -7,46 +7,41 @@ import org.junit.Test
 class AnalysisCombinerTest {
     private val noContent = ContentResult("general", 1.0, hadSignal = false)
 
-    /** Build a text signal from emotion scores. */
-    private fun text(vararg scores: Pair<String, Double>): TextEmotion =
-        TextEmotion(scores.toMap(), hadSignal = scores.isNotEmpty())
-
+    private fun text(vararg s: Pair<String, Double>) = TextEmotion(s.toMap(), hadSignal = s.isNotEmpty())
+    private fun face(vararg s: Pair<String, Double>) = FaceEmotion(s.toMap(), hadSignal = s.isNotEmpty())
     private val noText = TextEmotion(emptyMap(), hadSignal = false)
+    private val noFace = FaceEmotion(emptyMap(), hadSignal = false)
 
     @Test fun neither_signal_is_undetermined() {
-        val r = AnalysisCombiner.combine(noText, FaceSignal(0.0, hadSignal = false), noContent)
+        val r = AnalysisCombiner.combine(noText, noFace, noContent)
         assertEquals("undetermined", r.emotion)
-        assertEquals(0.0, r.sentiment, 0.0001)
-        assertEquals(0.0, r.emotionConfidence, 0.0001)
+        assertEquals(0.0, r.sentiment, 1e-9)
         assertTrue(r.emotionScores.isEmpty())
     }
 
-    @Test fun text_only_uses_text_and_keeps_scores() {
-        val r = AnalysisCombiner.combine(
-            text("joy" to 0.9, "neutral" to 0.1),
-            FaceSignal(0.0, hadSignal = false),
-            noContent
-        )
+    @Test fun text_only_passes_scores_through() {
+        val r = AnalysisCombiner.combine(text("joy" to 0.9, "neutral" to 0.1), noFace, noContent)
         assertEquals("joy", r.emotion)
         assertTrue(r.sentiment > 0.0)
-        assertEquals(0.9, r.emotionScores["joy"]!!, 0.0001) // 28-score map passes through
+        assertEquals(0.9, r.emotionScores["joy"]!!, 1e-9)
     }
 
-    @Test fun face_only_uses_face_sentiment() {
-        val r = AnalysisCombiner.combine(noText, FaceSignal(0.7, hadSignal = true), noContent)
+    @Test fun face_only_uses_mapped_scores() {
+        val r = AnalysisCombiner.combine(noText, face("joy" to 0.8), noContent)
+        assertEquals("joy", r.emotion)
         assertTrue(r.sentiment > 0.0)
-        assertEquals("joy", r.emotion) // positive face -> joy label
-        assertTrue(r.emotionScores.isEmpty()) // no text model scores in Phase 1 face-only
     }
 
-    @Test fun both_present_blends_sentiment() {
+    @Test fun both_blend_on_mapped_but_text_only_off_map() {
         val r = AnalysisCombiner.combine(
-            text("sadness" to 0.8),
-            FaceSignal(0.8, hadSignal = true),
+            text("joy" to 1.0, "admiration" to 0.5), // admiration is off the FER map
+            face("joy" to 0.0),                       // face sees no joy
             ContentResult("entertainment", 0.5, hadSignal = true)
         )
-        // sadness sentiment (~-0.56) blended with +0.8 face lands between them
-        assertTrue(r.sentiment > -0.56 && r.sentiment < 0.8)
+        // joy is FER-mapped: 1.0*0.6 + 0.0*0.4 = 0.60
+        assertEquals(0.60, r.emotionScores["joy"]!!, 1e-9)
+        // admiration is off-map: stays text-only = 0.5
+        assertEquals(0.50, r.emotionScores["admiration"]!!, 1e-9)
         assertEquals("entertainment", r.contentType)
     }
 }
