@@ -25,13 +25,12 @@ class EmotionModel(context: Context) {
         val opts = OrtSession.SessionOptions().apply {
             registerCustomOpLibrary(OrtxPackage.getLibraryPath())
         }
-        env.createSession(appContext.assets.open("tokenizer.onnx").readBytes(), opts)
+        env.createSession(ModelAssets.path(appContext, "tokenizer.onnx"), opts)
     }
     private val model: OrtSession by lazy {
-        env.createSession(
-            appContext.assets.open("emotion_model.onnx").readBytes(),
-            OrtSession.SessionOptions()
-        )
+        // Load from a file path (memory-mapped) — NOT readBytes(), which OOMs
+        // reading the 125 MB model onto the Java heap.
+        env.createSession(ModelAssets.path(appContext, "emotion_model.onnx"), OrtSession.SessionOptions())
     }
 
     /** Emotion -> score (0..1). Empty map when there's no text signal. */

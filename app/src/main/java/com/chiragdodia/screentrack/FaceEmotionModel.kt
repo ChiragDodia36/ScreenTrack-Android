@@ -19,10 +19,7 @@ class FaceEmotionModel(context: Context) {
     private val env: OrtEnvironment = OrtEnvironment.getEnvironment()
 
     private val session: OrtSession by lazy {
-        env.createSession(
-            appContext.assets.open("fer_model.onnx").readBytes(),
-            OrtSession.SessionOptions()
-        )
+        env.createSession(ModelAssets.path(appContext, "fer_model.onnx"), OrtSession.SessionOptions())
     }
 
     /** 8 softmax scores in FaceEmotionMap.FER_LABELS order. */
