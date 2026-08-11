@@ -166,6 +166,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val recentResults by viewModel.recentResults.collectAsState()
+            val moodResults by viewModel.moodResults.collectAsState()
             val latestResult by viewModel.latestResult.collectAsState()
             val isRunning by viewModel.isRunning.collectAsState()
             val isPaused by viewModel.isPaused.collectAsState()
@@ -212,20 +213,26 @@ class MainActivity : ComponentActivity() {
                 ActivityResultContracts.RequestPermission()
             ) { }
 
-            val exportHoursState = remember { mutableStateOf(1) }
-
-            val exportLauncher = rememberLauncherForActivityResult(
-                ActivityResultContracts.CreateDocument("text/csv")
-            ) { uri ->
-                if (uri != null) {
-                    coroutineScope.launch {
-                        val hours = exportHoursState.value
-                        val data = viewModel.loadRange(hours)
-                        val csvBytes = CsvExporter.buildHourlyCsv(data).toByteArray()
-                        withContext(Dispatchers.IO) {
-                            contentResolver.openOutputStream(uri)?.use { output ->
-                                output.write(csvBytes)
-                            }
+            // Build the hourly CSV and open the system Share sheet (Sheets/Drive/
+            // Gmail/Save-to-Files/upload-to-Form). Avoids the "no app opens a raw
+            // .csv in Files" problem by letting the user pick a target.
+            val shareCsv: (Int) -> Unit = { hours ->
+                coroutineScope.launch {
+                    val data = viewModel.loadRange(hours)
+                    val csv = CsvExporter.buildHourlyCsv(data)
+                    withContext(Dispatchers.IO) {
+                        val dir = java.io.File(cacheDir, "reports").apply { mkdirs() }
+                        val file = java.io.File(dir, "screentrack-report.csv").apply { writeText(csv) }
+                        val uri = androidx.core.content.FileProvider.getUriForFile(
+                            this@MainActivity, "$packageName.fileprovider", file
+                        )
+                        val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                            type = "text/csv"
+                            putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        withContext(Dispatchers.Main) {
+                            startActivity(android.content.Intent.createChooser(send, "Share report"))
                         }
                     }
                 }
@@ -346,7 +353,8 @@ class MainActivity : ComponentActivity() {
                                 selectedRange = selectedRange,
                                 onRangeSelected = { viewModel.setTimeRange(it) },
                                 filteredResults = filteredResults,
-                                allResults = recentResults
+                                allResults = recentResults,
+                                moodResults = moodResults
                             )
                             AppPage.Insights -> InsightsScreen(
                                 paddingValues = paddingValues,
@@ -361,10 +369,7 @@ class MainActivity : ComponentActivity() {
                                 dimensionError = dimensionError,
                                 pauseWhenScreenOff = pauseWhenScreenOff,
                                 onPauseWhenScreenOffChange = { pauseWhenScreenOff = it },
-                                onExportPdf = { hours ->
-                                    exportHoursState.value = hours
-                                    exportLauncher.launch("screentrack-report.csv")
-                                },
+                                onExportPdf = { hours -> shareCsv(hours) },
                                 onOpenSurvey = {
                                     startActivity(
                                         android.content.Intent(
@@ -786,7 +791,8 @@ private fun TrendsScreen(
     selectedRange: TimeRangeOption,
     onRangeSelected: (TimeRangeOption) -> Unit,
     filteredResults: List<CaptureResultEntity>,
-    allResults: List<CaptureResultEntity>
+    allResults: List<CaptureResultEntity>,
+    moodResults: List<CaptureResultEntity>
 ) {
     val analyticsStats = remember(filteredResults) { buildAnalyticsStats(filteredResults) }
     val emotionSlices = remember(filteredResults) { buildEmotionSlices(filteredResults) }
@@ -848,7 +854,7 @@ private fun TrendsScreen(
                 colors = CardDefaults.cardColors(containerColor = DarkSurface)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    SentimentLineChart(filteredResults)
+                    MoodBarChart(moodResults)
                 }
             }
         }
@@ -959,16 +965,19 @@ private fun InsightsScreen(
         buildPeriodComparison(filteredResults, allResults, selectedRange)
     }
 
-    val wellnessScore = remember(stats) {
-        if (filteredResults.isEmpty()) 50
+    val hasData = filteredResults.isNotEmpty()
+    val wellnessScore = remember(stats, hasData) {
+        if (!hasData) 0
         else ((stats.avgSentiment + 1.0) / 2.0 * 100).toInt().coerceIn(0, 100)
     }
     val wellnessColor = when {
+        !hasData -> TextSecondary
         wellnessScore >= 65 -> EmotionJoy
         wellnessScore >= 35 -> AccentAmber
         else -> EmotionAnger
     }
     val wellnessLabel = when {
+        !hasData -> "No data yet"
         wellnessScore >= 65 -> "Positive Mood"
         wellnessScore >= 35 -> "Moderate"
         else -> "Consider a Break"
@@ -1010,7 +1019,7 @@ private fun InsightsScreen(
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
-                                wellnessScore.toString(),
+                                if (hasData) wellnessScore.toString() else "—",
                                 style = MaterialTheme.typography.headlineLarge,
                                 fontWeight = FontWeight.Bold,
                                 color = wellnessColor
@@ -1282,7 +1291,7 @@ private fun SettingsScreen(
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SectionHeader("Data Management")
                     Text(
-                        "Export CSV Report",
+                        "Share CSV Report",
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondary,
                         fontWeight = FontWeight.Medium
@@ -1497,11 +1506,16 @@ private fun summarizeWindow(label: String, items: List<CaptureResultEntity>): Re
     )
 }
 
+/**
+ * Estimated *active* minutes — not the span between first & last capture.
+ * Each capture represents roughly one sampling interval of activity, so
+ * active time ≈ captures × interval. The interval is inferred from the median
+ * gap between consecutive captures (robust to pauses), defaulting to 15s.
+ */
 private fun calculateDurationMinutes(items: List<CaptureResultEntity>): Int? {
     if (items.isEmpty()) return null
-    val minTs = items.minOf { it.timestampMs }
-    val maxTs = items.maxOf { it.timestampMs }
-    return ((maxTs - minTs) / 60000.0).toInt().coerceAtLeast(0)
+    val intervalSec = MoodBuckets.estimateIntervalSeconds(items)
+    return (items.size * intervalSec / 60.0).toInt().coerceAtLeast(1)
 }
 
 private fun validateRange(value: Int, min: Int, max: Int, label: String): String? {

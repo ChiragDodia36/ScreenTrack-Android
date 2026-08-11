@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -20,8 +21,19 @@ class CaptureViewModel(
 
     private val selectedRange = MutableStateFlow(TimeRangeOption.LAST_24_HOURS)
 
-    val latestResult: StateFlow<CaptureResultEntity?> = repository.observeLatest()
+    // Live "current emotion" is smoothed over the last few captures (display-only,
+    // neutral-suppressed) so it doesn't flicker to neutral between emotional frames.
+    val latestResult: StateFlow<CaptureResultEntity?> = repository.observeRecentSince(0, limit = 6)
+        .map { EmotionSmoother.smooth(it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    // Fixed 30-day window feeding the mood chart's own Day/Week/Month tabs,
+    // independent of the page's range chips.
+    val moodResults: StateFlow<List<CaptureResultEntity>> =
+        repository.observeRecentSince(
+            System.currentTimeMillis() - java.util.concurrent.TimeUnit.DAYS.toMillis(30),
+            limit = 20000
+        ).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val recentResults: StateFlow<List<CaptureResultEntity>> = selectedRange
         .flatMapLatest { range ->
