@@ -229,6 +229,8 @@ class MainActivity : ComponentActivity() {
                         val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                             type = "text/csv"
                             putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                            // clipData carries the URI grant to the chooser preview + target app.
+                            clipData = android.content.ClipData.newRawUri("ScreenTrack report", uri)
                             addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         }
                         withContext(Dispatchers.Main) {
