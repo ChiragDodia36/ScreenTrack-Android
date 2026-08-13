@@ -6,15 +6,16 @@ import java.util.Locale
 
 /**
  * Hourly CSV report for the study. One row per hour that has captures:
- *   Date, Hour, <28 emotion columns>, positive, negative, neutral, <content columns>
- * - Emotion columns = average model score (0..1) for that emotion over the hour.
+ *   Date, Hour, <7 emotion columns>, positive_pct, negative_pct, neutral_pct, <content columns>
+ * - Emotion columns (6 Ekman basics + neutral) = average model score (0..1) over the hour.
  * - Sentiment + content columns = percentage (0..100) of the hour in each bucket.
  * Pure — no Android imports, unit-tested on the JVM.
  */
 object CsvExporter {
 
     val HEADER: List<String> =
-        listOf("Date", "Hour") + GO_EMOTIONS + listOf("positive", "negative", "neutral") +
+        listOf("Date", "Hour") + EkmanMap.EKMAN_EMOTIONS +
+            listOf("positive_pct", "negative_pct", "neutral_pct") +
             ContentClassifier.CATEGORY_NAMES
 
     fun buildHourlyCsv(items: List<CaptureResultEntity>): String {
@@ -34,8 +35,8 @@ object CsvExporter {
         val cells = ArrayList<String>(HEADER.size)
         cells += cell(formatDate(cal))
         cells += cell(formatHour(cal))
-        // emotion columns: average score over the hour
-        GO_EMOTIONS.forEach { e ->
+        // emotion columns (6 Ekman + neutral): average score over the hour
+        EkmanMap.EKMAN_EMOTIONS.forEach { e ->
             val avg = decoded.sumOf { it[e] ?: 0.0 } / n
             cells += String.format(Locale.US, "%.3f", avg)
         }

@@ -695,7 +695,7 @@ private fun HomeScreen(
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                SummaryRow("Content", "${latestResult.contentType} (${formatScore(latestResult.contentConfidence)})")
+                                SummaryRow("Content", "${prettyLabel(latestResult.contentType)} (${formatScore(latestResult.contentConfidence)})")
                             }
                         }
                     } else {
@@ -1127,7 +1127,7 @@ private fun InsightsScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(barColor))
-                                Text(ct, style = MaterialTheme.typography.bodySmall, color = TextSecondary, modifier = Modifier.width(80.dp))
+                                Text(prettyLabel(ct), style = MaterialTheme.typography.bodySmall, color = TextSecondary, modifier = Modifier.width(80.dp))
                                 Box(modifier = Modifier.weight(1f).height(8.dp).clip(RoundedCornerShape(4.dp)).background(DarkSurfaceVariant)) {
                                     Box(
                                         modifier = Modifier

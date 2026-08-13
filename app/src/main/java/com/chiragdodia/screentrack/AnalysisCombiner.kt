@@ -16,13 +16,16 @@ object AnalysisCombiner {
     private const val FACE_WEIGHT = 0.4
 
     fun combine(text: TextEmotion, face: FaceEmotion, content: ContentResult): AnalysisResult {
-        val scores = blend(text, face)
-        if (scores.isEmpty()) {
+        val scores28 = blend(text, face)
+        if (scores28.isEmpty()) {
             return AnalysisResult("undetermined", 0.0, 0.0, content.contentType, content.confidence, emptyMap())
         }
-        val top = scores.maxByOrNull { it.value }!!
-        val sentiment = EmotionValence.sentimentOf(scores).coerceIn(-1.0, 1.0)
-        return AnalysisResult(top.key, top.value, sentiment, content.contentType, content.confidence, scores)
+        // Sentiment from the full 28-emotion valence (more precise), then collapse
+        // the emotion label + stored scores to the 6 Ekman basics + neutral.
+        val sentiment = EmotionValence.sentimentOf(scores28).coerceIn(-1.0, 1.0)
+        val ekman = EkmanMap.toEkman(scores28)
+        val top = ekman.maxByOrNull { it.value }!!
+        return AnalysisResult(top.key, top.value, sentiment, content.contentType, content.confidence, ekman)
     }
 
     /**

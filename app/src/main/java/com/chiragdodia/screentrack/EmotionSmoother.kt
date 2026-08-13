@@ -21,7 +21,7 @@ object EmotionSmoother {
         val signal = window.map { EmotionScoresJson.decode(it.emotionScoresJson) }.filter { it.isNotEmpty() }
         if (signal.isEmpty()) return newest // all undetermined — leave as-is
 
-        val avg = GO_EMOTIONS.associateWith { e -> signal.map { it[e] ?: 0.0 }.average() }
+        val avg = EkmanMap.EKMAN_EMOTIONS.associateWith { e -> signal.map { it[e] ?: 0.0 }.average() }
         val topNonNeutral = avg.entries.filter { it.key != "neutral" }.maxByOrNull { it.value }
         val emotion = if (topNonNeutral != null && topNonNeutral.value >= SUPPRESS_THRESHOLD) topNonNeutral.key else "neutral"
         val sentiment = EmotionValence.sentimentOf(avg).coerceIn(-1.0, 1.0)

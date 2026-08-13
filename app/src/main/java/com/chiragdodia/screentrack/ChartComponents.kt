@@ -304,10 +304,14 @@ data class ChartSlice(
     val color: Color
 )
 
+/** snake_case category key -> human label, e.g. "general_or_miscellaneous" -> "General Or Miscellaneous". */
+fun prettyLabel(raw: String): String =
+    raw.split("_").joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+
 fun buildEmotionSlices(items: List<CaptureResultEntity>): List<ChartSlice> {
     val counts = items.groupingBy { it.emotion }.eachCount().toList().sortedByDescending { it.second }
     return counts.map { (label, count) ->
-        ChartSlice(label = label, value = count, color = emotionColor(label))
+        ChartSlice(label = prettyLabel(label), value = count, color = emotionColor(label))
     }
 }
 
@@ -315,7 +319,7 @@ fun buildContentSlices(items: List<CaptureResultEntity>): List<ChartSlice> {
     val counts = items.groupingBy { it.contentType }.eachCount().toList().sortedByDescending { it.second }
     return counts.mapIndexed { index, (label, count) ->
         val color = ContentPalette[index % ContentPalette.size]
-        ChartSlice(label = label, value = count, color = color)
+        ChartSlice(label = prettyLabel(label), value = count, color = color)
     }
 }
 
@@ -451,7 +455,7 @@ fun ContentBarChart(items: List<CaptureResultEntity>) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    contentType.replaceFirstChar { it.uppercase() },
+                    prettyLabel(contentType),
                     modifier = Modifier.width(80.dp),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -5,22 +5,30 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ContentClassifierTest {
-    @Test fun gaming_text_classified_gaming() {
-        val r = ContentClassifier.classify("level 5 respawn score coins achievement among us imposter")
-        assertEquals("gaming", r.contentType)
+    @Test fun detectsVideos() {
+        val r = ContentClassifier.classify("YouTube · watch?v=abc · Subscribe · 2M views · shorts")
+        assertEquals("videos", r.contentType)
         assertTrue(r.hadSignal)
     }
-    @Test fun education_text_classified_education() {
-        val r = ContentClassifier.classify("lecture chapter homework tutorial study exam course")
-        assertEquals("education", r.contentType)
+
+    @Test fun detectsHumorousContent() {
+        val r = ContentClassifier.classify("funniest memes comedy hilarious try not to laugh prank")
+        assertEquals("humorous_content", r.contentType)
     }
-    @Test fun social_text_classified_social() {
-        val r = ContentClassifier.classify("retweet like follow story reel comment")
-        assertEquals("social_media", r.contentType)
+
+    @Test fun detectsFoodRecipesCooking() {
+        val r = ContentClassifier.classify("easy recipe · cooking · ingredients · bake · delicious meal")
+        assertEquals("food_recipes_cooking", r.contentType)
     }
-    @Test fun unclassifiable_is_general_without_signal() {
+
+    @Test fun gibberishFallsBackToGeneral() {
         val r = ContentClassifier.classify("xggh qqzz lorem 1234")
-        assertEquals("general", r.contentType)
-        assertEquals(false, r.hadSignal)
+        assertEquals("general_or_miscellaneous", r.contentType)
+        assertTrue(!r.hadSignal)
+    }
+
+    @Test fun categoryNamesHasSevenWithGeneralLast() {
+        assertEquals(7, ContentClassifier.CATEGORY_NAMES.size)
+        assertEquals("general_or_miscellaneous", ContentClassifier.CATEGORY_NAMES.last())
     }
 }
