@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="80" fill="#0F1118"/>
+
+  <!-- Monitor frame outer -->
+  <rect x="96" y="130" width="320" height="196" rx="20" fill="none" stroke="#00D4AA" stroke-width="14"/>
+
+  <!-- Monitor stand neck -->
+  <rect x="226" y="326" width="60" height="36" fill="#00D4AA"/>
+
+  <!-- Monitor stand base -->
+  <rect x="176" y="362" width="160" height="20" rx="6" fill="#00D4AA"/>
+
+  <!-- Pulse/heartbeat line inside screen -->
+  <polyline
+    points="110,228 175,228 200,170 230,290 258,195 286,248 312,228 402,228"
+    fill="none"
+    stroke="#00D4AA"
+    stroke-width="12"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
+</svg>

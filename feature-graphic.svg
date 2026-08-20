@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500">
+  <!-- Background -->
+  <rect width="1024" height="500" fill="#0F1118"/>
+
+  <!-- Subtle gradient overlay -->
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1A1F2E;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0F1118;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="lineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#00D4AA;stop-opacity:0.3" />
+      <stop offset="50%" style="stop-color:#00D4AA;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00D4AA;stop-opacity:0.3" />
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="500" fill="url(#bgGrad)"/>
+
+  <!-- Decorative circle glow behind icon -->
+  <circle cx="200" cy="250" r="130" fill="#00D4AA" opacity="0.06"/>
+  <circle cx="200" cy="250" r="90" fill="#00D4AA" opacity="0.07"/>
+
+  <!-- Monitor frame -->
+  <rect x="100" y="155" width="200" height="130" rx="12" fill="none" stroke="#00D4AA" stroke-width="8"/>
+
+  <!-- Monitor stand neck -->
+  <rect x="190" y="285" width="22" height="24" fill="#00D4AA"/>
+
+  <!-- Monitor stand base -->
+  <rect x="162" y="309" width="78" height="10" rx="4" fill="#00D4AA"/>
+
+  <!-- Pulse line inside monitor -->
+  <polyline
+    points="114,220 148,220 162,193 178,248 192,205 206,228 220,220 286,220"
+    fill="none"
+    stroke="#00D4AA"
+    stroke-width="6"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
+
+  <!-- App name -->
+  <text x="340" y="220" font-family="Arial, sans-serif" font-size="72" font-weight="bold" fill="#FFFFFF" letter-spacing="-1">Screen</text>
+  <text x="340" y="300" font-family="Arial, sans-serif" font-size="72" font-weight="bold" fill="#00D4AA" letter-spacing="-1">Track</text>
+
+  <!-- Tagline -->
+  <text x="342" y="345" font-family="Arial, sans-serif" font-size="22" fill="#8A9BB0" letter-spacing="1">AI-powered screen &amp; mood analytics</text>
+
+  <!-- Decorative horizontal line -->
+  <line x1="340" y1="365" x2="700" y2="365" stroke="url(#lineGrad)" stroke-width="1.5"/>
+
+  <!-- Feature tags -->
+  <rect x="342" y="382" width="110" height="32" rx="16" fill="#00D4AA" opacity="0.15" stroke="#00D4AA" stroke-width="1"/>
+  <text x="397" y="403" font-family="Arial, sans-serif" font-size="14" fill="#00D4AA" text-anchor="middle">Emotion AI</text>
+
+  <rect x="466" y="382" width="110" height="32" rx="16" fill="#00D4AA" opacity="0.15" stroke="#00D4AA" stroke-width="1"/>
+  <text x="521" y="403" font-family="Arial, sans-serif" font-size="14" fill="#00D4AA" text-anchor="middle">Trends</text>
+
+  <rect x="590" y="382" width="110" height="32" rx="16" fill="#00D4AA" opacity="0.15" stroke="#00D4AA" stroke-width="1"/>
+  <text x="645" y="403" font-family="Arial, sans-serif" font-size="14" fill="#00D4AA" text-anchor="middle">Wellness</text>
+</svg>
